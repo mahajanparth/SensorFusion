@@ -9,4 +9,16 @@
  * 
  */
 
+#ifndef SENSOR_FUSION_HPP
+#define SENSOR_FUSION_HPP
 
+#include <rclcpp/rclcpp>
+
+
+
+class Sensor_Fusion{
+
+
+}; //Sensor Fusion
+
+#endif 

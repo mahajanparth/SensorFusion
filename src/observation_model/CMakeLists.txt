@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(obseravtion_model)
+project(observation_model)
 
 # Default to C99
 if(NOT CMAKE_C_STANDARD)
@@ -17,9 +17,27 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(Eigen3 REQUIRED)
+
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
+
+
+
+
+add_library(${PROJECT_NAME} SHARED
+  src/baseObservationModel.cpp 
+)
+ament_target_dependencies(${PROJECT_NAME} Eigen3 )
+
+target_link_libraries(${PROJECT_NAME}
+  PRIVATE Eigen3::Eigen
+)
+target_include_directories(${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -31,5 +49,14 @@ if(BUILD_TESTING)
   #set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
+
+install(
+  TARGETS ${PROJECT_NAME}
+  EXPORT export_${PROJECT_NAME}
+  ARCHIVE DESTINATION lib
+  LIBRARY DESTINATION lib
+  RUNTIME DESTINATION bin
+  INCLUDES DESTINATION include
+)
 
 ament_package()

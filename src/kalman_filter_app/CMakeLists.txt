@@ -20,6 +20,12 @@ find_package(ament_cmake REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(kalman_filter_core REQUIRED)
+find_package(motion_model REQUIRED)
+find_package(observation_model REQUIRED)
+find_package(sensor_msgs  REQUIRED)
+find_package(geometry_msgs  REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(Eigen REQUIRED)
 
 
 if(BUILD_TESTING)
