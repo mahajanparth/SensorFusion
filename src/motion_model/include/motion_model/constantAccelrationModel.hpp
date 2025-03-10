@@ -1,0 +1,31 @@
+/**
+ * @file baseMotionModel.hpp
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2025-03-09
+ * 
+ * @copyright Copyright (c) 2025
+ * 
+ */
+
+#ifndef CONSTANT_ACCELRATION_MOTION_MODEL_HPP
+#define CONSTANT_ACCELRATION_MOTION_MODEL_HPP
+#include <Eigen/Dense>
+#include <functional>
+
+
+namespace motionmodel{
+
+    class ConstantMotionModel: public BaseMotionModel {
+
+        public:
+
+        ConstantMotionModel()  = default;
+        ~ConstantMotionModel() = default;  
+     
+    }
+
+}; //motionamodel
+
+#endif 
