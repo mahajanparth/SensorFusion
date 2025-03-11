@@ -34,24 +34,15 @@ We apply the EKF in an **8‐dimensional** state space to track:
 
 ---
 
+
+![System State ](./media/EKFALGO2.png "EKF ALGO")
+
+
 ## State Definition
 
 We define the system state as the vector:
 
-\[
-x_t = 
-\begin{bmatrix}
-x \\ 
-y \\ 
-\theta \\
-v_x \\
-v_y \\
-\omega \\
-a_x \\
-a_y 
-\end{bmatrix}
-\]
-
+![System State ](./media/8Dof8DofStateVector.png " 8 Dof System State")
 where:
 
 - \(x, y\) : Position in the plane  
@@ -68,28 +59,14 @@ The state covariance is an \(8 \times 8\) matrix \(\Sigma\).
 
 We assume a **constant acceleration** motion model over a time step \(\Delta_t\). The **nonlinear** function \(g\) predicts the next state \(x_{t}\) from \(x_{t-1}\) and control input \(u_t\):
 
-\[
-g(u_t, x_{t-1}) =
-\begin{bmatrix}
-x + v\cos(\theta)\,\Delta_t + 0.5\,a_x\,\Delta_t^2 \\[6pt]
-y + v\sin(\theta)\,\Delta_t + 0.5\,a_y\,\Delta_t^2 \\[6pt]
-\theta + \omega\,\Delta_t \\[6pt]
-v \cos(\theta) + a_x\,\Delta_t \\[6pt]
-v \sin(\theta) + a_y\,\Delta_t \\[6pt]
-\omega \\[6pt]
-a_x \\[6pt]
-a_y
-\end{bmatrix}
-\]
+![Constant Accelration Motion Model ](NonLinearMotionModel.png)
 
 where \(v = \sqrt{v_x^2 + v_y^2}\). 
 
 ### Jacobian \(G_t\)
 Because \(g\) is nonlinear, the EKF uses the Jacobian:
 
-\[
-G_t = \frac{\partial g}{\partial x}\Big|_{x_{t-1}}
-\]
+![Constant Accelration Motion Model ](JacobianOfNonLinearMotionModel.png)
 
 to linearize the process model at the current state estimate.
 
@@ -97,7 +74,7 @@ to linearize the process model at the current state estimate.
 
 ## Control Input
 
-Depending on your application, you can include external inputs (e.g., throttle, steering commands in a vehicle) in \(u_t\). If no external commands exist, you may set \(u_t = \mathbf{0}\) and rely solely on the motion model.
+No Control Input was considered in this application 
 
 ---
 
@@ -119,7 +96,7 @@ Depending on your application, you can include external inputs (e.g., throttle, 
 
 ## Update Step
 
-Upon receiving a measurement \(z_t\), the EKF incorporates the sensor reading:
+Upon receiving a measurement (z_t), the EKF incorporates the sensor reading:
 
 1. **Measurement Prediction**:  
    \[
@@ -151,4 +128,15 @@ Upon receiving a measurement \(z_t\), the EKF incorporates the sensor reading:
 - \(z_t\) is the actual measurement vector at time \(t\).
 
 ---
+
+#Future Scope of the Project :
+
+1) ADD UKF in the kalman core module 
+2) compare with constant velocity model 
+3) modify the package to take in multiple instances of sensor module 
+
+
+Download ROSBAG LINK : https://www.dropbox.com/scl/fi/tdxin6bzw01siucdv3kgv/linkou-2023-12-27-2-med.zip?rlkey=rcz93bhozjsdymcpn5dqz6rly&e=1&dl=0
+
+
 
