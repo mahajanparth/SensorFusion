@@ -24,9 +24,8 @@ find_package(Eigen3 REQUIRED)
 
 
 add_library(${PROJECT_NAME} SHARED src/constantAccelrationModel.cpp)
-
 ament_target_dependencies(${PROJECT_NAME}  Eigen3)
-
+target_link_libraries(${PROJECT_NAME}  Eigen3::Eigen)
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>

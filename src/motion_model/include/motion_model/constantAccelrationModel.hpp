@@ -13,6 +13,7 @@
 #define CONSTANT_ACCELRATION_MOTION_MODEL_HPP
 #include <Eigen/Dense>
 #include <functional>
+#include <motion_model/baseMotionModel.hpp>
 
 
 namespace motionmodel{
@@ -24,7 +25,7 @@ namespace motionmodel{
         ConstantMotionModel()  = default;
         ~ConstantMotionModel() = default;  
      
-    }
+    };
 
 }; //motionamodel
 

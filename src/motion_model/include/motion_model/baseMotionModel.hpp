@@ -29,7 +29,7 @@ namespace motionmodel{
         std::function<Eigen::VectorXd(const Eigen::VectorXd&, const Eigen::VectorXd&, double)> process_model;
         std::function<Eigen::MatrixXd(const Eigen::VectorXd&, const Eigen::VectorXd&, double)> process_jac;
         
-    }
+    };
 
 }; //motionmodel
 

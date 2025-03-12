@@ -25,7 +25,7 @@ find_package(observation_model REQUIRED)
 find_package(sensor_msgs  REQUIRED)
 find_package(geometry_msgs  REQUIRED)
 find_package(nav_msgs REQUIRED)
-find_package(Eigen REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 
 if(BUILD_TESTING)

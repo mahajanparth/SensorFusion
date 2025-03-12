@@ -28,7 +28,7 @@ namespace observationmodel{
         std::function<Eigen::VectorXd(const Eigen::VectorXd&, const Eigen::VectorXd&, double)> observation_func;
         std::function<Eigen::MatrixXd(const Eigen::VectorXd&, const Eigen::VectorXd&, double)> observation_jac;
         
-    }
+    };
 
 }; //motionmodel
 

@@ -23,9 +23,6 @@ find_package(Eigen3 REQUIRED)
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
-
-
-
 add_library(${PROJECT_NAME} SHARED
   src/baseObservationModel.cpp 
 )
@@ -58,5 +55,7 @@ install(
   RUNTIME DESTINATION bin
   INCLUDES DESTINATION include
 )
+ament_export_targets(export_${PROJECT_NAME})
+ament_export_dependencies(Eigen3)
 
 ament_package()

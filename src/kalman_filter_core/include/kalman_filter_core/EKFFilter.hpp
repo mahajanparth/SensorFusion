@@ -9,8 +9,8 @@
  * 
  */
 
-#ifndef EKFFILTER_H
-#define EKFFILTER_H
+#ifndef EKFFILTER_HPP
+#define EKFFILTER_HPP
 
 #include <Eigen/Dense>
 #include <functional>
@@ -40,7 +40,7 @@ namespace kalman{
         Eigen::MatrixXd x_posterior_cov;
 
         int dim_x;
-        int dim_Z;
+        int dim_z;
 
         EKF()=default;
 
@@ -111,7 +111,7 @@ namespace kalman{
         int getDimZ() const;
 
 
-    }
+    };
 
 }; //kalman 
 
