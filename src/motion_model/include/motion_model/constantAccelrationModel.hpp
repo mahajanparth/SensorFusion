@@ -18,12 +18,12 @@
 
 namespace motionmodel{
 
-    class ConstantMotionModel: public BaseMotionModel {
+    class ConstantAccMotionModel: public BaseMotionModel {
 
         public:
 
-        ConstantMotionModel()  = default;
-        ~ConstantMotionModel() = default;  
+        ConstantAccMotionModel();
+        ~ConstantAccMotionModel() = default;  
      
     };
 

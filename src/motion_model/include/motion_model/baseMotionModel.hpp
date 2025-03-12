@@ -19,11 +19,11 @@ namespace motionmodel{
 
     class BaseMotionModel{
 
-        private:
+        
+        public:
+
         BaseMotionModel()  = default;
         ~BaseMotionModel() = default;
-
-        public:
 
         //TODO : Convert to a template instead
         std::function<Eigen::VectorXd(const Eigen::VectorXd&, const Eigen::VectorXd&, double)> process_model;

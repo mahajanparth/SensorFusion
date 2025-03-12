@@ -25,11 +25,11 @@ namespace observationmodel{
         ~BaseObservationModel() = default;
         
         //TODO : Convert to a template instead
-        std::function<Eigen::VectorXd(const Eigen::VectorXd&, const Eigen::VectorXd&, double)> observation_func;
-        std::function<Eigen::MatrixXd(const Eigen::VectorXd&, const Eigen::VectorXd&, double)> observation_jac;
+        std::function<Eigen::VectorXd(const Eigen::VectorXd&, double)> observation_func;
+        std::function<Eigen::MatrixXd(const Eigen::VectorXd&, double)> observation_jac;
         
     };
 
-}; //motionmodel
+}; //observationmodel
 
 #endif 
