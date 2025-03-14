@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef SENSOR_FUSION_HPP
-#define SENSOR_FUSION_HPP
+#ifndef BASESENSOR_FUSION_HPP
+#define BASESENSOR_FUSION_HPP
 
 #include <rclcpp/rclcpp>
 #include <kalman_filter_core/EKFFilter.hpp>
