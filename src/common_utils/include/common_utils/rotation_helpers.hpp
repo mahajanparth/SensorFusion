@@ -5,7 +5,10 @@
 #include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <tf2_geometry_msgs/msg/tf2_geometry_msgs.h>
+#include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
+
 #include <cmath>
 #include <tuple>
 
@@ -23,6 +26,20 @@ std::tuple<double, double, double> odom_to_pose2D(const nav_msgs::msg::Odometry:
 
     return x_y_yaw;
 }
+
+
+double quat_to_yaw(const tf2_geometry_msgs::msg::Quaternion quat)
+{
+    tf2::Quaternion q(quat.x, quat.y, quat.z, quat.w);
+    tf2::Matrix3x3 m(q);
+
+    double roll, pitch, yaw;
+    m.getRPY(roll, pitch, yaw);
+
+    return yaw;
+}
+
+
 
 double normalize_angle(double angle)
 {

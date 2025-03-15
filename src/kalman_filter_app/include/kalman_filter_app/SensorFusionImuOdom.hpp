@@ -27,8 +27,8 @@ namespace sensor_fusion
                             const Eigen::vectorXd &initial_cov,
                             const Eigen::VectorXd &proc_noise_std,
                             const Eigen::VectorXd &obs_noise_std,
-                            motionmodel::BaseMotionModel motion_model,
-                            observationmodel::BaseObservationModel observation_model);
+                            std::shared_ptr<motionmodel::BaseMotionModel> motion_model,
+                            std::shared_ptr<observationmodel::BaseObservationModel> observation_model);
         ~SensorFusionImuOdom() = default;
 
     }; // Base_Sensor_Fusion

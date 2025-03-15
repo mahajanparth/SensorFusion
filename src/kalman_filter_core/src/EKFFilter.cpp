@@ -22,6 +22,8 @@ kalman::EKF::EKF(const Eigen::VectorXd &initial_state, const Eigen::MatrixXd &in
 
     x_posterior_mean = x_prior_mean;
     x_posterior_cov = x_prior_cov;
+
+    
 }
 
 std::pair<Eigen::VectorXd, Eigen::MatrixXd> kalman::EKF::predict(const Eigen::VectorXd &u, double dt)

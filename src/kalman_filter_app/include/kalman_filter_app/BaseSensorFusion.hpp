@@ -22,9 +22,10 @@ namespace sensor_fusion
     class Base_Sensor_Fusion
     {
 
-        kalman::EKF ekf_filter_;
-        motionmodel::BaseMotionModel motion_model;
-        observationmodel::BaseObservationModel observation_model;
+        public:
+        std::shared_ptr<kalman::EKF> ekf_filter_;
+        std::shared_ptr<motionmodel::BaseMotionModel> motion_model;
+        std::shared_ptr<observationmodel::BaseObservationModel> observation_model;
 
         Sensor_Fusion() = default;
         ~Sensor_Fusion() = default;
