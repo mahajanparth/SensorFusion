@@ -32,6 +32,47 @@ We apply the EKF in an **8‐dimensional** state space to track:
 - Angular velocity (`omega`)
 - Acceleration (`a_x`, `a_y`)
 
+## Features
+
+- Implements **nonlinear motion models** such as constant acceleration.
+- Supports **sensor observation models**, including IMU and odometry fusion.
+- Modular **EKF framework** with customizable process and observation models.
+- **ROS2-compatible** for real-time robotic state estimation.
+- **Configurable process noise and sensor noise covariance matrices.**
+
+
+```
+src/
+│── motion_model/                   # Motion model implementations
+│   ├── include/motion_model/       # Motion model headers
+│   ├── src/                        # Source files for motion models
+│   ├── CMakeLists.txt              # CMake configuration for motion models
+│   ├── package.xml                 # ROS2 package definition
+│
+│── observation_model/               # Observation model implementations
+│   ├── include/observation_model/  # Observation model headers
+│   ├── src/                        # Source files for observation models
+│   ├── CMakeLists.txt              # CMake configuration for observation models
+│   ├── package.xml                 # ROS2 package definition
+│
+│── kalman_filter/                   # EKF implementation
+│   ├── include/kalman_filter/      # EKF headers
+│   ├── src/                        # Source files for EKF
+│   ├── CMakeLists.txt              # CMake configuration for EKF
+│   ├── package.xml                 # ROS2 package definition
+│
+│── kalman_filter_app/               # Main application
+│   ├── src/                        # Main application source files
+│   ├── CMakeLists.txt              # CMake configuration for application
+│   ├── package.xml                 # ROS2 package definition
+│
+│── common_utils/                    # Utility functions (e.g., coordinate conversion)
+│   ├── include/common_utils/       # Utility headers
+│   ├── src/                        # Source files for utilities
+│   ├── CMakeLists.txt              # CMake configuration for utilities
+│
+```
+
 ---
 
 
@@ -127,6 +168,61 @@ Upon receiving a measurement (z_t), the EKF incorporates the sensor reading:
 - (Q_t) is the measurement noise covariance.  
 - (z_t) is the actual measurement vector at time (t).
 
+
+
+
+## Installation and Usage
+
+
+## Dependencies
+
+To use this project, ensure the following dependencies are installed:
+
+- **ROS2 (Humble/Foxy recommended)**
+- **Eigen3** for matrix operations
+- **C++17 or higher**
+- **CMake** (minimum version 3.5)
+- **Colcon** (for ROS2 package builds)
+
+## Installation & Build
+
+### **1. Clone the Repository**
+
+```bash
+
+git clone https://github.com/mahajanparth/SensorFusion --recursive
+cd SensorFusion
+
+```
+
+### **2. Install Dependencies**
+
+```bash
+sudo apt update && sudo apt install -y ros-foxy-eigen3 ros-foxy-colcon
+```
+
+### **3. Build the Project**
+
+```bash
+colcon build --symlink-install
+```
+
+### **4. Source the Workspace**
+
+```bash
+source install/setup.bash
+```
+
+## Run Procedure
+
+### **1. Launch the Full Sensor Fusion Pipeline**
+
+```bash
+ros2 launch kalman_filter_app launch_ekf_node.py
+
+ros2 bag play <bag_file>.bag --clock 
+
+```
 ---
 
 #Future Scope of the Project :
@@ -135,8 +231,18 @@ Upon receiving a measurement (z_t), the EKF incorporates the sensor reading:
 2) compare with constant velocity model 
 3) modify the package to take in multiple instances of sensor module 
 
-
+---
 Download ROSBAG LINK : https://www.dropbox.com/scl/fi/tdxin6bzw01siucdv3kgv/linkou-2023-12-27-2-med.zip?rlkey=rcz93bhozjsdymcpn5dqz6rly&e=1&dl=0
+
+---
+
+## Contributors
+
+- **Parth Mahajan** (Author)
+
+## License
+
+This project is licensed under the **MIT License**.
 
 
 
