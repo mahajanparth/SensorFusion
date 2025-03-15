@@ -14,21 +14,21 @@
 SensorFusionNode::SensorFusionNode(const std::string &name) : rclcpp::Node(name)
 {
     // Declare ROS2 Parameters
-    this->declare_parameter<std::vector<double>>("Q_process_noise",std::vector<double>({0.0}));
-    this->declare_parameter<int>("Q_rows",0);
-    this->declare_parameter<int>("Q_cols",0);
+    this->declare_parameter<std::vector<double>>("Q_process_noise", std::vector<double>({0.0}));
+    this->declare_parameter<int>("Q_rows", 0);
+    this->declare_parameter<int>("Q_cols", 0);
 
-    this->declare_parameter<std::vector<double>>("R_observation_noise",std::vector<double>({0.0}));
-    this->declare_parameter<int>("R_rows",0);
-    this->declare_parameter<int>("R_cols",0);
+    this->declare_parameter<std::vector<double>>("R_observation_noise", std::vector<double>({0.0}));
+    this->declare_parameter<int>("R_rows", 0);
+    this->declare_parameter<int>("R_cols", 0);
 
-    this->declare_parameter<std::vector<double>>("X_init",std::vector<double>({0.0}));
-    this->declare_parameter<int>("X_init_rows",0);
-    this->declare_parameter<int>("X_init_cols",0);
+    this->declare_parameter<std::vector<double>>("X_init", std::vector<double>({0.0}));
+    this->declare_parameter<int>("X_init_rows", 0);
+    this->declare_parameter<int>("X_init_cols", 0);
 
-    this->declare_parameter<std::vector<double>>("Cov_init",std::vector<double>({0.0}));
-    this->declare_parameter<int>("Cov_init_rows",0);
-    this->declare_parameter<int>("Cov_init_cols",0);
+    this->declare_parameter<std::vector<double>>("Cov_init", std::vector<double>({0.0}));
+    this->declare_parameter<int>("Cov_init_rows", 0);
+    this->declare_parameter<int>("Cov_init_cols", 0);
 
     // Load parameters from ROS2
     std::vector<double> Q_data = this->get_parameter("Q_process_noise").as_double_array();
@@ -41,7 +41,7 @@ SensorFusionNode::SensorFusionNode(const std::string &name) : rclcpp::Node(name)
 
     std::vector<double> X_data = this->get_parameter("X_init").as_double_array();
     int X_rows = this->get_parameter("X_init_rows").as_int();
-    
+
     std::vector<double> Cov_data = this->get_parameter("Cov_init").as_double_array();
     int Cov_rows = this->get_parameter("Cov_init_rows").as_int();
     int Cov_cols = this->get_parameter("Cov_init_cols").as_int();
@@ -105,7 +105,9 @@ void SensorFusionNode::odom_callback(const std::shared_ptr<nav_msgs::msg::Odomet
 
     std::tie(Mu, Cov) = filter->ekf_filter_->predict(u_control, dt);
     std::vector<double> z_vec = {std::get<0>(current_pose2d), std::get<1>(current_pose2d), std::get<2>(current_pose2d), normalize_imu_delta_angle, imu_w, ax, ay};
+    std::cout << " MU " << " Cov " << std::endl;
 
     z_observation = Eigen::Map<Eigen::VectorXd>(z_vec.data(), z_vec.size());
     std::tie(Mu, Cov) = filter->ekf_filter_->update(z_observation, dt);
+    std::cout << " MU " << " Cov" << std::endl;
 }
