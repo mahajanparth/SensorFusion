@@ -16,17 +16,25 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 # find dependencies
-# find_package(ament_cmake REQUIRED)
-# find_package(std_msgs REQUIRED)
-# find_package(rclcpp REQUIRED)
-# find_package(kalman_filter_core REQUIRED)
-# find_package(motion_model REQUIRED)
-# find_package(observation_model REQUIRED)
-# find_package(sensor_msgs  REQUIRED)
-# find_package(geometry_msgs  REQUIRED)
-# find_package(nav_msgs REQUIRED)
-# find_package(Eigen3 REQUIRED)
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(kalman_filter_core REQUIRED)
+find_package(motion_model REQUIRED)
+find_package(observation_model REQUIRED)
+find_package(Eigen3 REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(sensor_msgs  REQUIRED)
+find_package(geometry_msgs  REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(common_utils REQUIRED)
 
+add_executable(${PROJECT_NAME} src/SensorFusionNode.cpp src/SensorFusionImuOdom.cpp )
+ament_target_dependencies(${PROJECT_NAME} kalman_filter_core motion_model observation_model Eigen3 std_msgs sensor_msgs geometry_msgs common_utils nav_msgs rclcpp)
+
+target_include_directories(${PROJECT_NAME} PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -38,5 +46,6 @@ if(BUILD_TESTING)
   #set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
+
 
 ament_package()

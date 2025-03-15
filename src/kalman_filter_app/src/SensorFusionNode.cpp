@@ -9,76 +9,103 @@
  *
  */
 
-#include <SensorFusionNode.hpp>
+#include <kalman_filter_app/SensorFusionNode.hpp>
 
-
-SensorFusionNode::SensorFusionNode(const string name) : Node(name)
+SensorFusionNode::SensorFusionNode(const std::string &name) : rclcpp::Node(name)
 {
-    this->declare_parameter<std::vector<double>>("Q_process_noise");
-    this->declare_parameter<int>("Q_rows");
-    this->declare_parameter<int>("Q_cols");
+    // Declare ROS2 Parameters
+    this->declare_parameter<std::vector<double>>("Q_process_noise",std::vector<double>({0.0}));
+    this->declare_parameter<int>("Q_rows",0);
+    this->declare_parameter<int>("Q_cols",0);
 
-    this->declare_parameter<std::vector<double>>("R_observation_noise");
-    this->declare_parameter<int>("R_rows");
-    this->declare_parameter<int>("R_cols");
+    this->declare_parameter<std::vector<double>>("R_observation_noise",std::vector<double>({0.0}));
+    this->declare_parameter<int>("R_rows",0);
+    this->declare_parameter<int>("R_cols",0);
 
-    this->declare_parameter<std::vector<double>>("X_init");
-    this->declare_parameter<int>("X_init_rows");
-    this->declare_parameter<int>("X_init_cols");
+    this->declare_parameter<std::vector<double>>("X_init",std::vector<double>({0.0}));
+    this->declare_parameter<int>("X_init_rows",0);
+    this->declare_parameter<int>("X_init_cols",0);
 
-    this->declare_parameter<std::vector<double>>("Cov_init");
-    this->declare_parameter<int>("Cov_init_rows");
-    this->declare_parameter<int>("Cov_init_cols");
+    this->declare_parameter<std::vector<double>>("Cov_init",std::vector<double>({0.0}));
+    this->declare_parameter<int>("Cov_init_rows",0);
+    this->declare_parameter<int>("Cov_init_cols",0);
 
-    Q_process_noise = Eigen::Map<Eigen::MatrixXd>(this->get_parameter("Q_process_noise").as_double_array(), this->get_parameter("Q_rows").as_int(), this->get_parameter("Q_cols").as_int());
-    R_observation_state = Eigen::Map<Eigen::MatrixXd>(this->get_parameter("R_observation_noise").as_double_array(), this->get_parameter("R_rows").as_int(), this->get_parameter("R_cols").as_int());
+    // Load parameters from ROS2
+    std::vector<double> Q_data = this->get_parameter("Q_process_noise").as_double_array();
+    int Q_rows = this->get_parameter("Q_rows").as_int();
+    int Q_cols = this->get_parameter("Q_cols").as_int();
 
-    Mu = Eigen::VectorXd(this->get_parameter("X_init").as_double_array(), , this->get_parameter("X_init_rows").as_int(), this->get_parameter("X_init_cols").as_int());
-    cov = Eigen::Map<Eigen::MatrixXd>(this->get_parameter("Cov_init").as_double_array(), this->get_parameter("Cov_init_rows").as_int(), this->get_parameter("Cov_init_cols").as_int());
+    std::vector<double> R_data = this->get_parameter("R_observation_noise").as_double_array();
+    int R_rows = this->get_parameter("R_rows").as_int();
+    int R_cols = this->get_parameter("R_cols").as_int();
 
-    motionmodel_ = std::make_shared<motionmodel::ConstantAccMotionModel>();
+    std::vector<double> X_data = this->get_parameter("X_init").as_double_array();
+    int X_rows = this->get_parameter("X_init_rows").as_int();
+    
+    std::vector<double> Cov_data = this->get_parameter("Cov_init").as_double_array();
+    int Cov_rows = this->get_parameter("Cov_init_rows").as_int();
+    int Cov_cols = this->get_parameter("Cov_init_cols").as_int();
 
+    // Convert parameters to Eigen structures
+    Q_process_noise = Eigen::Map<Eigen::MatrixXd>(Q_data.data(), Q_rows, Q_cols);
+    R_observation_state = Eigen::Map<Eigen::MatrixXd>(R_data.data(), R_rows, R_cols);
+    Mu = Eigen::Map<Eigen::VectorXd>(X_data.data(), X_rows);
+    Cov = Eigen::Map<Eigen::MatrixXd>(Cov_data.data(), Cov_rows, Cov_cols);
+
+    // Create Motion and Observation Models
+    motion_model_ = std::make_shared<motionmodel::ConstantAccMotionModel>();
     observation_model_ = std::make_shared<observationmodel::ImuOdomObservationModel>();
 
-    filter = std::make_shared<sensor_fusion::SensorFusionImuOdom>(Mu, cov, Q_process_noise, R_observation_state, motion_model, observation_model);
-    odom_sub_ = rclcpp::create_subscription<sensor_msgs::msgs::Odometry>("/odom", 10, std::bind(&SensorFusionNode::odom_callback, this, std::Placeholder::_1));
-    imu_sub_ = rclcpp::create_subscription<sensor_msgs::msgs::Odometry>("/imu", 10, std::bind(&SensorFusionNode::imu_callback, this, std::Placeholder::_1))
+    // Initialize Sensor Fusion Filter
+    filter = std::make_shared<sensor_fusion::SensorFusionImuOdom>(
+        Mu, Cov, Q_process_noise, R_observation_state, motion_model_, observation_model_);
+
+    // Create Subscribers
+    odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
+        "/odom", 10, std::bind(&SensorFusionNode::odom_callback, this, std::placeholders::_1));
+
+    imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
+        "/imu", 10, std::bind(&SensorFusionNode::imu_callback, this, std::placeholders::_1));
 }
 
-void SensorFusionNode::imu_callback(const std::shared_ptr<nav_msgs::msgs::Imu> imu_msg)
+void SensorFusionNode::imu_callback(const std::shared_ptr<sensor_msgs::msg::Imu> imu_msg)
 {
-    ax = imu_msg->linear_accelration.x;
-    ay = imu_msg->linear_accelration.x;
+    ax = imu_msg->linear_acceleration.x;
+    ay = imu_msg->linear_acceleration.x;
     imu_w = imu_msg->angular_velocity.z;
 
     double imu_thetha = quat_to_yaw(imu_msg->orientation);
 
     if (!initial_imu_flag)
     {
-        imu_initial_thetha = imu_thetha;
+        initial_imu_thetha = imu_thetha;
         initial_imu_flag = true;
         return;
     }
 
-    delta_thetha = normalize_angle(imu_theta - imu_initial_thetha);
+    double delta_thetha = normalize_angle(imu_thetha - initial_imu_thetha);
     normalize_imu_delta_angle = delta_thetha;
 }
 
-void SensorFusionNode::odom_callback(const std::shared_ptr<nav_msgs::msgs::Odometry> odom_msg)
+void SensorFusionNode::odom_callback(const std::shared_ptr<nav_msgs::msg::Odometry> odom_msg)
 {
 
     if (!initial_pose_flag)
     {
 
-        initial_pose2d = rotate_pose2D(odom_to_pose2D(imu_msg.get()), -90);
+        initial_pose2d = rotate_pose2D(odom_to_pose2D(odom_msg), -90);
         initial_pose_flag = true;
         return;
     }
-    current_pose2d = get_normalized_pose2D(initial_pose2d, rotate_pose2D(odom_to_pose2D(imu_msg.get()), -90));
+    current_pose2d = get_normalize_pose2D(initial_pose2d, rotate_pose2D(odom_to_pose2D(odom_msg), -90));
 
-    u_control = {odom_msg->twist.twist.linear.x, odom_msg->twist.twist.linear.y, odom_msg->twist.twist.angular} dt = 0.1 Mu, Cov = filter.predict(u, 0.1) mu, cov = self.kf.predict(self.u, dt);
+    std::vector<double> u_control_vec = {odom_msg->twist.twist.linear.x, odom_msg->twist.twist.linear.y, odom_msg->twist.twist.angular};
+    double dt = 0.1; // make thi based on two msg time diff
+    u_control = z_observation = Eigen::Map<Eigen::VectorXd>(u_control_vec.data(), u_control_vec.size());
 
-    [ mu, cov ] = filter.predict(u_control, dt);
-    z_observation = {std::get<0>(current_pose2d), std::get<1>(current_pose2d), std::get<2>(current_pose2d), normalize_imu_delta_angle, imu_w, imu_a_x, imu_a_y} mu,
-    [ mu, cov ] = filter.update(z_observation, dt);
+    std::tie(Mu, Cov) = filter->ekf_filter_->predict(u_control, dt);
+    std::vector<double> z_vec = {std::get<0>(current_pose2d), std::get<1>(current_pose2d), std::get<2>(current_pose2d), normalize_imu_delta_angle, imu_w, ax, ay};
+
+    z_observation = Eigen::Map<Eigen::VectorXd>(z_vec.data(), z_vec.size());
+    std::tie(Mu, Cov) = filter->ekf_filter_->update(z_observation, dt);
 }

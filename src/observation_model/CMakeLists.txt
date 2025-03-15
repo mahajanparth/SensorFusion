@@ -55,7 +55,14 @@ install(
   RUNTIME DESTINATION bin
   INCLUDES DESTINATION include
 )
+
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
+
+ament_export_include_directories(include)
+ament_export_libraries(${PROJECT_NAME})
 ament_export_targets(export_${PROJECT_NAME})
-ament_export_dependencies(Eigen3)
 
 ament_package()

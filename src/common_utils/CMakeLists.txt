@@ -19,8 +19,8 @@ endif()
 find_package(ament_cmake REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2 REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
 
 
 
@@ -29,7 +29,7 @@ find_package(tf2 REQUIRED)
 # find_package(<dependency> REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED src/rotation_helpers.cpp )
-ament_target_dependencies(${PROJECT_NAME}  Eigen3 geometry_msgs tf2_geometry_msgs tf2)
+ament_target_dependencies(${PROJECT_NAME}  Eigen3 geometry_msgs  )
 
 target_link_libraries(${PROJECT_NAME}  Eigen3::Eigen)
 
@@ -59,6 +59,14 @@ install(
   INCLUDES DESTINATION include
 )
 
+install(
+  DIRECTORY include/
+  DESTINATION include
+)
+
+ament_export_include_directories(include)
+ament_export_libraries(${PROJECT_NAME})
 ament_export_targets(export_${PROJECT_NAME})
+
 
 ament_package()

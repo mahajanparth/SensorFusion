@@ -9,16 +9,18 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <!-- <depend>std_msgs</depend>
+  <depend>std_msgs</depend>
   <depend>rclcpp</depend>
   <depend>kalman_filter_core</depend>
   <depend>motion_model</depend>
   <depend>observation_model</depend>
+  <depend>common_utils</depend>
+  
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>Eigen</depend>
-   -->
+  
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
