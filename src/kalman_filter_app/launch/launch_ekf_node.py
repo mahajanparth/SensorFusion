@@ -9,6 +9,7 @@ def generate_launch_description():
     ekf_node = Node(
         package="kalman_filter_app",
         executable="kalman_filter_app",
+        output='screen',
         parameters=[
             {"Q_process_noise": [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                                 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
@@ -32,8 +33,7 @@ def generate_launch_description():
             {"R_cols": 7},
 
             {"X_init": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]},
-            {"X_init_rows": 1},
-            {"X_init_cols": 8},
+            {"X_init_size": 8},
 
             {"Cov_init": [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
                         0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,

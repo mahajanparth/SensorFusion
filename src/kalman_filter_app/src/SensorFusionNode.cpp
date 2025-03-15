@@ -15,20 +15,19 @@ SensorFusionNode::SensorFusionNode(const std::string &name) : rclcpp::Node(name)
 {
     // Declare ROS2 Parameters
     this->declare_parameter<std::vector<double>>("Q_process_noise", std::vector<double>({0.0}));
-    this->declare_parameter<int>("Q_rows", 0);
-    this->declare_parameter<int>("Q_cols", 0);
+    this->declare_parameter<int>("Q_rows", 1);
+    this->declare_parameter<int>("Q_cols", 1);
 
     this->declare_parameter<std::vector<double>>("R_observation_noise", std::vector<double>({0.0}));
-    this->declare_parameter<int>("R_rows", 0);
-    this->declare_parameter<int>("R_cols", 0);
+    this->declare_parameter<int>("R_rows", 1);
+    this->declare_parameter<int>("R_cols", 1);
 
     this->declare_parameter<std::vector<double>>("X_init", std::vector<double>({0.0}));
-    this->declare_parameter<int>("X_init_rows", 0);
-    this->declare_parameter<int>("X_init_cols", 0);
+    this->declare_parameter<int>("X_init_size", 1);
 
     this->declare_parameter<std::vector<double>>("Cov_init", std::vector<double>({0.0}));
-    this->declare_parameter<int>("Cov_init_rows", 0);
-    this->declare_parameter<int>("Cov_init_cols", 0);
+    this->declare_parameter<int>("Cov_init_rows", 1);
+    this->declare_parameter<int>("Cov_init_cols", 1);
 
     // Load parameters from ROS2
     std::vector<double> Q_data = this->get_parameter("Q_process_noise").as_double_array();
@@ -40,27 +39,49 @@ SensorFusionNode::SensorFusionNode(const std::string &name) : rclcpp::Node(name)
     int R_cols = this->get_parameter("R_cols").as_int();
 
     std::vector<double> X_data = this->get_parameter("X_init").as_double_array();
-    int X_rows = this->get_parameter("X_init_rows").as_int();
+    int X_rows = this->get_parameter("X_init_size").as_int();
 
     std::vector<double> Cov_data = this->get_parameter("Cov_init").as_double_array();
     int Cov_rows = this->get_parameter("Cov_init_rows").as_int();
     int Cov_cols = this->get_parameter("Cov_init_cols").as_int();
 
-    // Convert parameters to Eigen structures
+    // Debug print statements
+    std::cout << "Q_process_noise (size: " << Q_data.size() << "): ";
+    for (double val : Q_data)
+        std::cout << val << " ";
+    std::cout << "\nQ_rows: " << Q_rows << ", Q_cols: " << Q_cols << std::endl;
+
+    std::cout << "R_observation_noise (size: " << R_data.size() << "): ";
+    for (double val : R_data)
+        std::cout << val << " ";
+    std::cout << "\nR_rows: " << R_rows << ", R_cols: " << R_cols << std::endl;
+
+    std::cout << "X_init (size: " << X_data.size() << "): ";
+    for (double val : X_data)
+        std::cout << val << " ";
+    std::cout << "\nX_rows: " << X_rows << std::endl;
+
+    std::cout << "Cov_init (size: " << Cov_data.size() << "): ";
+    for (double val : Cov_data)
+        std::cout << val << " ";
+    std::cout << "\nCov_rows: " << Cov_rows << ", Cov_cols: " << Cov_cols << std::endl;
+    
+
+    
     Q_process_noise = Eigen::Map<Eigen::MatrixXd>(Q_data.data(), Q_rows, Q_cols);
     R_observation_state = Eigen::Map<Eigen::MatrixXd>(R_data.data(), R_rows, R_cols);
     Mu = Eigen::Map<Eigen::VectorXd>(X_data.data(), X_rows);
     Cov = Eigen::Map<Eigen::MatrixXd>(Cov_data.data(), Cov_rows, Cov_cols);
 
-    // Create Motion and Observation Models
+    
     motion_model_ = std::make_shared<motionmodel::ConstantAccMotionModel>();
     observation_model_ = std::make_shared<observationmodel::ImuOdomObservationModel>();
 
-    // Initialize Sensor Fusion Filter
+    
     filter = std::make_shared<sensor_fusion::SensorFusionImuOdom>(
         Mu, Cov, Q_process_noise, R_observation_state, motion_model_, observation_model_);
 
-    // Create Subscribers
+    
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
         "/odom", 10, std::bind(&SensorFusionNode::odom_callback, this, std::placeholders::_1));
 
