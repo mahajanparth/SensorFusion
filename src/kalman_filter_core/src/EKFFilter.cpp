@@ -22,8 +22,6 @@ kalman::EKF::EKF(const Eigen::VectorXd &initial_state, const Eigen::MatrixXd &in
 
     x_posterior_mean = x_prior_mean;
     x_posterior_cov = x_prior_cov;
-
-    
 }
 
 std::pair<Eigen::VectorXd, Eigen::MatrixXd> kalman::EKF::predict(const Eigen::VectorXd &u, double dt)
@@ -31,18 +29,18 @@ std::pair<Eigen::VectorXd, Eigen::MatrixXd> kalman::EKF::predict(const Eigen::Ve
     x_prior_mean = nonlinear_process_model(x_prior_mean, u, dt);
     Eigen::MatrixXd G_jac = process_jac(x_prior_mean, u, dt);
     x_prior_cov = G_jac * x_prior_cov * G_jac.transpose() + q_process_noise;
-    return { x_prior_mean, x_prior_cov };
+    return {x_prior_mean, x_prior_cov};
 }
 
 std::pair<Eigen::VectorXd, Eigen::MatrixXd> kalman::EKF::update(const Eigen::VectorXd &z, double dt)
 {
-    Eigen::MatrixXd H_jac = observation_jac(x_prior_mean);
+    Eigen::MatrixXd H_jac = observation_jac(x_prior_mean, dt);
 
     Eigen::MatrixXd S = H_jac * x_prior_cov * H_jac.transpose() + r_sensor_noise;
 
     Eigen::MatrixXd K = x_prior_cov * H_jac.transpose() * S.inverse();
 
-    x_posterior_mean = x_prior_mean + K * (z - observation_func(x_prior_mean));
+    x_posterior_mean = x_prior_mean + K * (z - observation_func(x_prior_mean, dt));
 
     Eigen::MatrixXd I = Eigen::MatrixXd::Identity(x_prior_cov.rows(), x_prior_cov.cols());
     x_posterior_cov = (I - K * H_jac) * x_prior_cov;
@@ -50,7 +48,7 @@ std::pair<Eigen::VectorXd, Eigen::MatrixXd> kalman::EKF::update(const Eigen::Vec
     x_prior_mean = x_posterior_mean;
     x_prior_cov = x_posterior_cov;
 
-    return { x_posterior_mean, x_posterior_cov };
+    return {x_posterior_mean, x_posterior_cov};
 }
 
 // Getter and setter for the nonlinear process model.
@@ -74,21 +72,21 @@ const std::function<Eigen::MatrixXd(const Eigen::VectorXd &, const Eigen::Vector
 }
 
 // Getter and setter for the observation function.
-void kalman::EKF::setObservationFunction(const std::function<Eigen::VectorXd(const Eigen::VectorXd &)> &func)
+void kalman::EKF::setObservationFunction(const std::function<Eigen::VectorXd(const Eigen::VectorXd &, const double )> &func)
 {
     observation_func = func;
 }
-const std::function<Eigen::VectorXd(const Eigen::VectorXd &)> &kalman::EKF::getObservationFunction() const
+const std::function<Eigen::VectorXd(const Eigen::VectorXd &, const double )> &kalman::EKF::getObservationFunction() const
 {
     return observation_func;
 }
 
 // Getter and setter for the observation Jacobian.
-void kalman::EKF::setObservationJacobian(const std::function<Eigen::MatrixXd(const Eigen::VectorXd &)> &jac)
+void kalman::EKF::setObservationJacobian(const std::function<Eigen::MatrixXd(const Eigen::VectorXd &, const double )> &jac)
 {
     observation_jac = jac;
 }
-const std::function<Eigen::MatrixXd(const Eigen::VectorXd &)> &kalman::EKF::getObservationJacobian() const
+const std::function<Eigen::MatrixXd(const Eigen::VectorXd &, const double )> &kalman::EKF::getObservationJacobian() const
 {
     return observation_jac;
 }

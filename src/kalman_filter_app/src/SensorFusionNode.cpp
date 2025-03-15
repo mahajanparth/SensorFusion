@@ -99,7 +99,7 @@ void SensorFusionNode::odom_callback(const std::shared_ptr<nav_msgs::msg::Odomet
     }
     current_pose2d = get_normalize_pose2D(initial_pose2d, rotate_pose2D(odom_to_pose2D(odom_msg), -90));
 
-    std::vector<double> u_control_vec = {odom_msg->twist.twist.linear.x, odom_msg->twist.twist.linear.y, odom_msg->twist.twist.angular};
+    std::vector<double> u_control_vec = {odom_msg->twist.twist.linear.x, odom_msg->twist.twist.linear.y, odom_msg->twist.twist.angular.z};
     double dt = 0.1; // make thi based on two msg time diff
     u_control = z_observation = Eigen::Map<Eigen::VectorXd>(u_control_vec.data(), u_control_vec.size());
 

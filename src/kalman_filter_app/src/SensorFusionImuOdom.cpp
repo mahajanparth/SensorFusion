@@ -20,7 +20,7 @@ sensor_fusion::SensorFusionImuOdom::SensorFusionImuOdom(const Eigen::VectorXd &i
 {
     motion_model = mtn_mdl;
     observation_model = obs_mdl;
-    ekf_filter_ = std::make_shared<kalman::EKF>(initial_state, initial_cov, proc_noise_std, obs_noise_std, mtn_mdl, obs_mdl);
+    ekf_filter_ = std::make_shared<kalman::EKF>(initial_state, initial_cov, proc_noise_std, obs_noise_std);
     // Convert setNonlinearProcessModel
     // Direct assignment instead of std::bind
     ekf_filter_->setNonlinearProcessModel(mtn_mdl->process_model);

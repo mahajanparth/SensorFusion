@@ -13,7 +13,7 @@
 #include <cmath>
 #include <tuple>
 
-std::tuple<double, double, double> odom_to_pose2D(const nav_msgs::msg::Odometry::SharedPtr &odom)
+inline std::tuple<double, double, double> odom_to_pose2D(const nav_msgs::msg::Odometry::SharedPtr &odom)
 {
     std::tuple<double, double, double> x_y_yaw = {0, 0, 0};
     std::get<0>(x_y_yaw) = odom->pose.pose.position.x;
@@ -29,7 +29,7 @@ std::tuple<double, double, double> odom_to_pose2D(const nav_msgs::msg::Odometry:
 }
 
 
-double quat_to_yaw(const geometry_msgs::msg::Quaternion quat)
+inline double quat_to_yaw(const geometry_msgs::msg::Quaternion quat)
 {
     tf2::Quaternion q(quat.x, quat.y, quat.z, quat.w);
     tf2::Matrix3x3 m(q);
@@ -42,7 +42,7 @@ double quat_to_yaw(const geometry_msgs::msg::Quaternion quat)
 
 
 
-double normalize_angle(double angle)
+inline double normalize_angle(double angle)
 {
     while (angle > M_PI)
         angle -= 2 * M_PI;
@@ -51,7 +51,7 @@ double normalize_angle(double angle)
     return angle;
 }
 
-std::tuple<double, double, double> get_normalize_pose2D(const std::tuple<double, double, double> &initial_pose, const std::tuple<double, double, double> &current_pose)
+inline std::tuple<double, double, double> get_normalize_pose2D(const std::tuple<double, double, double> &initial_pose, const std::tuple<double, double, double> &current_pose)
 {
 
     auto [x, y, yaw] = current_pose;
@@ -66,16 +66,16 @@ std::tuple<double, double, double> get_normalize_pose2D(const std::tuple<double,
 
 
 // Function to convert degrees to radians
-double degreesToRadians(double degrees) {
+inline double degreesToRadians(double degrees) {
     return degrees * M_PI / 180.0;
 }
 
 // Function to convert radians to degrees
-double radiansToDegrees(double radians) {
+inline double radiansToDegrees(double radians) {
     return radians * 180.0 / M_PI;
 }
 
-std::tuple<double, double, double> rotate_pose2D(const std::tuple<double, double, double>& pose, double degrees) {
+inline std::tuple<double, double, double> rotate_pose2D(const std::tuple<double, double, double>& pose, double degrees) {
     // Convert degrees to radians
     double radians = degreesToRadians(degrees);
 

@@ -28,7 +28,7 @@ find_package(geometry_msgs  REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(common_utils REQUIRED)
 
-add_executable(${PROJECT_NAME} src/SensorFusionNode.cpp src/SensorFusionImuOdom.cpp )
+add_executable(${PROJECT_NAME} src/EkfOdomImuNode.cpp src/SensorFusionNode.cpp src/SensorFusionImuOdom.cpp )
 ament_target_dependencies(${PROJECT_NAME} kalman_filter_core motion_model observation_model Eigen3 std_msgs sensor_msgs geometry_msgs common_utils nav_msgs rclcpp)
 
 target_include_directories(${PROJECT_NAME} PUBLIC
