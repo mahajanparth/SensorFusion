@@ -55,8 +55,8 @@ src/
 │   ├── CMakeLists.txt              # CMake configuration for observation models
 │   ├── package.xml                 # ROS2 package definition
 │
-│── kalman_filter/                   # EKF implementation
-│   ├── include/kalman_filter/      # EKF headers
+│── kalman_filter_core/              # EKF implementation
+│   ├── include/kalman_filter_core/ # EKF headers
 │   ├── src/                        # Source files for EKF
 │   ├── CMakeLists.txt              # CMake configuration for EKF
 │   ├── package.xml                 # ROS2 package definition
@@ -76,14 +76,14 @@ src/
 ---
 
 
-![Alt System State ](./media/EKFALGO2.png "EKF ALGO")
+![Alt System State ](./media/EKF_ALGO2.png "EKF ALGO")
 
 
 ## State Definition
 
 We define the system state as the vector:
 
-![Alt System State ](./media/8Dof8DofStateVector.png " 8 Dof System State")
+![Alt System State ](./media/8DofStateVector.png " 8 Dof System State")
 where:
 
 - \(x, y\) : Position in the plane  
@@ -100,14 +100,14 @@ The state covariance is an \(8 \times 8\) matrix \(\Sigma\).
 
 We assume a **constant acceleration** motion model over a time step \(\Delta_t\). The **nonlinear** function \(g\) predicts the next state \(x_{t}\) from \(x_{t-1}\) and control input \(u_t\):
 
-![Alt Constant Accelration Motion Model ](NonLinearMotionModel.png)
+![Alt Constant Accelration Motion Model ](./media/NonLinearMotionModel.png)
 
 where \(v = \sqrt{v_x^2 + v_y^2}\). 
 
 ### Jacobian \(G_t\)
 Because \(g\) is nonlinear, the EKF uses the Jacobian:
 
-![Alt Constant Accelration Motion Model ](JacobianOfNonLinearMotionModel.png)
+![Alt Constant Accelration Motion Model ](./media/JacobianOfNonLinearMotionModel.png)
 
 to linearize the process model at the current state estimate.
 
