@@ -4,6 +4,7 @@
 #include <Eigen/Dense>
 #include <functional>
 #include <utility>
+#include <vector>
 
 namespace kalman
 {
@@ -31,12 +32,17 @@ namespace kalman
         int dim_x;
         int dim_z;
 
+        // Indices of observation rows that are angles; their innovation is wrapped to [-pi, pi].
+        std::vector<int> angle_indices_z;
+        // Linearize the process model at the previous posterior (textbook EKF) instead of the predicted mean.
+        bool linearize_at_previous_mean = true;
+
     public:
         EKF() = default;
         ~EKF() = default;
 
         EKF(const Eigen::VectorXd &initial_state, const Eigen::MatrixXd &initial_cov,
-            const Eigen::VectorXd &proc_noise_std, const Eigen::VectorXd &obs_noise_std);
+            const Eigen::MatrixXd &proc_noise_cov, const Eigen::MatrixXd &obs_noise_cov);
 
         std::pair<Eigen::VectorXd, Eigen::MatrixXd> predict(const Eigen::VectorXd &u, double dt = 0);
         std::pair<Eigen::VectorXd, Eigen::MatrixXd> update(const Eigen::VectorXd &z, double dt = 0);
@@ -88,6 +94,9 @@ namespace kalman
         // Getter and setter for the posterior covariance.
         void setPosteriorCovariance(const Eigen::MatrixXd &cov);
         const Eigen::MatrixXd &getPosteriorCovariance() const;
+
+        void setAngleIndices(const std::vector<int> &indices);
+        void setLinearizeAtPreviousMean(bool flag);
 
         // Getter and setter for the dimension of the state.
         void setDimX(int d);

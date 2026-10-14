@@ -30,9 +30,9 @@ namespace sensor_fusion
 
         public:
         SensorFusionImuOdom(const Eigen::VectorXd &initial_state,
-                            const Eigen::VectorXd &initial_cov,
-                            const Eigen::VectorXd &proc_noise_std,
-                            const Eigen::VectorXd &obs_noise_std,
+                            const Eigen::MatrixXd &initial_cov,
+                            const Eigen::MatrixXd &proc_noise_cov,
+                            const Eigen::MatrixXd &obs_noise_cov,
                             std::shared_ptr<motionmodel::BaseMotionModel> motion_model,
                             std::shared_ptr<observationmodel::BaseObservationModel> observation_model);
         ~SensorFusionImuOdom() = default;

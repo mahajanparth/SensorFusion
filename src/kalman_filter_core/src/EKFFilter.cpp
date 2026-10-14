@@ -10,8 +10,9 @@
  */
 
 #include <kalman_filter_core/EKFFilter.hpp>
+#include <cmath>
 
-kalman::EKF::EKF(const Eigen::VectorXd &initial_state, const Eigen::MatrixXd &initial_cov, const Eigen::VectorXd &proc_noise_std, const Eigen::VectorXd &obs_noise_std) : x_prior_mean{initial_state}, x_prior_cov{initial_cov}, q_process_noise{proc_noise_std}, r_sensor_noise{obs_noise_std}
+kalman::EKF::EKF(const Eigen::VectorXd &initial_state, const Eigen::MatrixXd &initial_cov, const Eigen::MatrixXd &proc_noise_cov, const Eigen::MatrixXd &obs_noise_cov) : q_process_noise{proc_noise_cov}, r_sensor_noise{obs_noise_cov}, x_prior_mean{initial_state}, x_prior_cov{initial_cov}
 {
     nonlinear_process_model = nullptr;
     process_jac = nullptr;
@@ -26,8 +27,17 @@ kalman::EKF::EKF(const Eigen::VectorXd &initial_state, const Eigen::MatrixXd &in
 
 std::pair<Eigen::VectorXd, Eigen::MatrixXd> kalman::EKF::predict(const Eigen::VectorXd &u, double dt)
 {
-    x_prior_mean = nonlinear_process_model(x_prior_mean, u, dt);
-    Eigen::MatrixXd G_jac = process_jac(x_prior_mean, u, dt);
+    Eigen::MatrixXd G_jac;
+    if (linearize_at_previous_mean)
+    {
+        G_jac = process_jac(x_prior_mean, u, dt);
+        x_prior_mean = nonlinear_process_model(x_prior_mean, u, dt);
+    }
+    else
+    {
+        x_prior_mean = nonlinear_process_model(x_prior_mean, u, dt);
+        G_jac = process_jac(x_prior_mean, u, dt);
+    }
     x_prior_cov = G_jac * x_prior_cov * G_jac.transpose() + q_process_noise;
     return {x_prior_mean, x_prior_cov};
 }
@@ -40,7 +50,11 @@ std::pair<Eigen::VectorXd, Eigen::MatrixXd> kalman::EKF::update(const Eigen::Vec
 
     Eigen::MatrixXd K = x_prior_cov * H_jac.transpose() * S.inverse();
 
-    x_posterior_mean = x_prior_mean + K * (z - observation_func(x_prior_mean, dt));
+    Eigen::VectorXd innovation = z - observation_func(x_prior_mean, dt);
+    for (int idx : angle_indices_z)
+        innovation(idx) = std::atan2(std::sin(innovation(idx)), std::cos(innovation(idx)));
+
+    x_posterior_mean = x_prior_mean + K * innovation;
 
     Eigen::MatrixXd I = Eigen::MatrixXd::Identity(x_prior_cov.rows(), x_prior_cov.cols());
     x_posterior_cov = (I - K * H_jac) * x_prior_cov;
@@ -169,6 +183,16 @@ void kalman::EKF::setPosteriorCovariance(const Eigen::MatrixXd &cov)
 const Eigen::MatrixXd &kalman::EKF::getPosteriorCovariance() const
 {
     return x_posterior_cov;
+}
+
+void kalman::EKF::setAngleIndices(const std::vector<int> &indices)
+{
+    angle_indices_z = indices;
+}
+
+void kalman::EKF::setLinearizeAtPreviousMean(bool flag)
+{
+    linearize_at_previous_mean = flag;
 }
 
 // Getter and setter for the dimension of the state.

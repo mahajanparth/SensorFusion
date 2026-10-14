@@ -12,15 +12,15 @@
 #include <kalman_filter_app/SensorFusionImuOdom.hpp>
 
 sensor_fusion::SensorFusionImuOdom::SensorFusionImuOdom(const Eigen::VectorXd &initial_state,
-                                                        const Eigen::VectorXd &initial_cov,
-                                                        const Eigen::VectorXd &proc_noise_std,
-                                                        const Eigen::VectorXd &obs_noise_std,
+                                                        const Eigen::MatrixXd &initial_cov,
+                                                        const Eigen::MatrixXd &proc_noise_cov,
+                                                        const Eigen::MatrixXd &obs_noise_cov,
                                                         std::shared_ptr<motionmodel::BaseMotionModel> mtn_mdl,
                                                         std::shared_ptr<observationmodel::BaseObservationModel> obs_mdl)
 {
     motion_model = mtn_mdl;
     observation_model = obs_mdl;
-    ekf_filter_ = std::make_shared<kalman::EKF>(initial_state, initial_cov, proc_noise_std, obs_noise_std);
+    ekf_filter_ = std::make_shared<kalman::EKF>(initial_state, initial_cov, proc_noise_cov, obs_noise_cov);
     // Convert setNonlinearProcessModel
     // Direct assignment instead of std::bind
     ekf_filter_->setNonlinearProcessModel(mtn_mdl->process_model);
