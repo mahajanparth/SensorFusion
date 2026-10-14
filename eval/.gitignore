@@ -1,0 +1,6 @@
+.docker_ws/
+.docker_ws.log
+__pycache__/
+results/run_*/
+results/inputs.npz
+results/*.log
