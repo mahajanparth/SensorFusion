@@ -8,6 +8,7 @@ Inputs:  the Linkou bag (ground truth + baselines, cached to results/inputs.npz)
 Outputs: results/metrics.csv, results/metrics.md, results/*.png
 """
 import csv
+import json
 import os
 
 import matplotlib
@@ -189,6 +190,12 @@ def main():
             m = evaluate_window(tr, gps, ref, tstart + a, tstart + b)
             results[name][k] = m
             rows.append(dict(window=name, method=k, **{x: y for x, y in m.items() if not x.startswith('_')}))
+
+    # Full-run SE(2) alignments (estimate frame -> GPS ENU frame anchored at the first /fix),
+    # used by the RViz visualization so its overlay matches these plots.
+    with open(os.path.join(RES, 'alignment.json'), 'w') as f:
+        json.dump({k: dict(yaw=float(np.arctan2(m['_R'][1, 0], m['_R'][0, 0])), t=[float(v) for v in m['_t']])
+                   for k, m in results['full'].items()}, f, indent=2)
 
     keys = ['window', 'method', 'n_gps', 'ate_gps', 'ate_gps_good', 'ate_gps_max', 'ate_ref', 'yaw_rmse_deg', 'rpe10']
     with open(os.path.join(RES, 'metrics.csv'), 'w', newline='') as f:
