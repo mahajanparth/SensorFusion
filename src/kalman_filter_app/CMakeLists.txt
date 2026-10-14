@@ -49,6 +49,7 @@ endif()
 install(TARGETS kalman_filter_app
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
-install(DIRECTORY launch DESTINATION  share/${PROJECT_NAME})
+install(DIRECTORY launch rviz DESTINATION  share/${PROJECT_NAME})
+install(PROGRAMS scripts/variant_path_publisher.py DESTINATION lib/${PROJECT_NAME})
 
 ament_package()
