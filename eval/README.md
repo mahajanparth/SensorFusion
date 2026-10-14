@@ -11,7 +11,7 @@ The IMU + wheel-odometry EKF was run on a real 240 s outdoor drive (`linkou-2023
 | **EKF-B**: fixed model, odom *pose* + twist + IMU | 19.30 m | 3.5° | 10.19 m |
 | **EKF-C**: fixed model, odom *twist* + IMU | **1.72 m** | **1.2°** | **0.27 m** |
 
-Per-segment numbers (4 × 60 s, each re-aligned) are in [results/metrics.md](results/metrics.md). In every segment C has the lowest ATE and RPE. Its heading RMSE is also the lowest or close to it (0.6–1.8°), except in segments 2–3, where B's heading is 0.3–0.5° better.
+Per-segment numbers (4 x 60 s, each re-aligned) are in [results/metrics.md](results/metrics.md). In every segment C has the lowest ATE and RPE. Its heading RMSE is also the lowest or close to it (0.6-1.8°), except in segments 2-3, where B's heading is 0.3-0.5° better.
 
 ![full trajectory](results/traj_full.png)
 ![segments](results/traj_segments.png)
@@ -22,11 +22,11 @@ Per-segment numbers (4 × 60 s, each re-aligned) are in [results/metrics.md](res
 - **The wheel odometry heading drifts about 130° over the run.** Its yaw rate reads about 20 % high and has a bias. The IMU yaw matches the reference to within about 2°, so all of the useful correction comes from the IMU heading.
 - **A tracks wheel odometry almost exactly.** A treats the wheel odom pose as an absolute measurement with R = 0.05 and sets IMU accel noise equal to it. The position therefore follows the drifting odom pose. Heading is a compromise between the two sources, and the jitter shows up as the large RPE.
 - **B gets the heading right but not the position.** The odom pose (position plus the drifting odom yaw) is still treated as an absolute measurement, so it pulls the position back onto the wheel trajectory. The fused heading and the odom position disagree, which produces jumps (RPE 10 m). Feeding an integrated odometry pose as an independent measurement is the core design error.
-- **C fuses the right quantities:** body-frame wheel velocity, IMU yaw rate and yaw, and gravity-compensated IMU acceleration. Position is dead-reckoned from velocity × IMU heading. The error peaks at 5.1 m in the first 15 s, then stays below 2.6 m for the rest of the run. The filter's own 3σ bound contains it (plot 4). A and B claim 3σ < 1 m while being 20+ m off, so they are inconsistent.
+- **C fuses the right quantities:** body-frame wheel velocity, IMU yaw rate and yaw, and gravity-compensated IMU acceleration. Position is dead-reckoned from velocity x IMU heading. The error peaks at 5.1 m in the first 15 s, then stays below 2.6 m for the rest of the run. The filter's own 3σ bound contains it (plot 4). A and B claim 3σ < 1 m while being 20+ m off, so they are inconsistent.
 - About 1.7 m is close to the GPS floor. 64 % of `/fix` samples have a horizontal variance > 2 m² (open circles). Most of C's remaining error is in the first 30 s, where the GPS is poorest.
 
 ## Ground truth and its limitations
-- **`/navrelposned` (RTK) is not usable as position ground truth.** The receiver runs in moving-base mode: RELPOSNED is the antenna-to-antenna baseline (0–5 m) and is valid in only 94/240 messages. `/navheading` reports a covariance of 1000+ rad² throughout. Position ground truth is therefore **`/fix` GPS** (1 Hz, standard fix, σ ≈ 0.3–5 m), converted to a local ENU frame.
+- **`/navrelposned` (RTK) is not usable as position ground truth.** The receiver runs in moving-base mode: RELPOSNED is the antenna-to-antenna baseline (0-5 m) and is valid in only 94/240 messages. `/navheading` reports a covariance of 1000+ rad² throughout. Position ground truth is therefore **`/fix` GPS** (1 Hz, standard fix, σ ≈ 0.3-5 m), converted to a local ENU frame.
 - **`/odom`** (4.6 Hz) is used as a dense secondary reference, for heading and for "ATE vs /odom ref". It agrees with GPS to 1.6 m. However, it matches EKF-C to 0.26 m, which suggests it is itself a wheel + IMU fusion. Treat it as a reference, **not independent ground truth**. The GPS columns are the independent metric.
 - Every trajectory is aligned to the ground truth with an SE(2) Umeyama fit (rotation + translation, no scale) before ATE is computed. Heading error is computed after removing each method's constant yaw offset.
 
