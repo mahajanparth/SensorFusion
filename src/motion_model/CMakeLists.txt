@@ -23,7 +23,7 @@ find_package(ament_cmake REQUIRED)
 find_package(Eigen3 REQUIRED)
 
 
-add_library(${PROJECT_NAME} SHARED src/constantAccelrationModel.cpp)
+add_library(${PROJECT_NAME} SHARED src/constantAccelrationModel.cpp src/constantAccelerationWorldModel.cpp)
 
 ament_target_dependencies(${PROJECT_NAME}  Eigen3)
 target_link_libraries(${PROJECT_NAME}  Eigen3::Eigen)
