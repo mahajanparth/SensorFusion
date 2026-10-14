@@ -37,10 +37,12 @@ def make_node(context):
     return [Node(
         package="kalman_filter_app",
         executable="kalman_filter_app",
+        name=LaunchConfiguration("node_name"),
         output='screen',
         remappings=[
             ("/odom", LaunchConfiguration("odom_topic")),
             ("/imu", LaunchConfiguration("imu_topic")),
+            ("/ekf/odom", LaunchConfiguration("output_topic")),
         ],
         parameters=[
             {"model_fixes": v["model_fixes"]},
@@ -65,5 +67,7 @@ def generate_launch_description():
         DeclareLaunchArgument("variant", default_value="C", description="A, B or C (see VARIANTS)"),
         DeclareLaunchArgument("odom_topic", default_value="/wheel_odom"),
         DeclareLaunchArgument("imu_topic", default_value="/imu/data_raw"),
+        DeclareLaunchArgument("output_topic", default_value="/ekf/odom"),
+        DeclareLaunchArgument("node_name", default_value="IMUODOMNODE"),
         OpaqueFunction(function=make_node),
     ])
