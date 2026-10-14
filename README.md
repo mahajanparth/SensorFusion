@@ -218,11 +218,93 @@ source install/setup.bash
 ### **1. Launch the Full Sensor Fusion Pipeline**
 
 ```bash
-ros2 launch kalman_filter_app launch_ekf_node.py
+# variant:=A|B|C (default C), inputs default to /wheel_odom and /imu/data_raw
+ros2 launch kalman_filter_app launch_ekf_node.py variant:=C
 
-ros2 bag play <bag_file>.bag --clock 
-
+ros2 bag play <bag_dir> --topics /wheel_odom /imu/data_raw
 ```
+
+The fused estimate is published on `/ekf/odom` (`nav_msgs/Odometry`). To reproduce the evaluation below, see [eval/README.md](eval/README.md).
+
+---
+
+## Evaluation: three EKF variants on a real drive
+
+All three variants were run on the Linkou bag linked below: a 240 s, ~247 m outdoor drive with wheel odometry (`/wheel_odom`) and an IMU (`/imu/data_raw`).
+- **Ground truth:** GPS `/fix`. It's a standard fix, not RTK, with σ ≈ 0.3–5 m, so errors below ~1.5 m are within GPS noise.
+- **Alignment:** every trajectory is aligned to GPS with an SE(2) Umeyama fit (rotation + translation, no scale).
+- **Heading:** heading error is measured against the bag's `/odom` reference.
+
+All variants share the same EKF core, the same 8-D state `[x, y, θ, vx, vy, ω, ax, ay]` and the same bug fixes. They differ only in the motion model and in what they fuse:
+
+| | EKF-A | EKF-B | EKF-C |
+|---|---|---|---|
+| Motion model | original: speed √(vx²+vy²) along θ | world-frame constant acceleration | world-frame constant acceleration |
+| Jacobian evaluated at | predicted mean | previous posterior | previous posterior |
+| Measurement z | odom x, y, θ · IMU θ, ω, ax, ay (7) | odom x, y, θ · IMU θ, ω · odom v_fwd, v_lat · IMU ax, ay (9) | IMU θ, ω · odom v_fwd, v_lat · IMU ax, ay (6) |
+| Odom pose fused | yes | yes | **no** |
+| IMU accel | raw, includes gravity tilt | gravity removed, compared in body frame | gravity removed, compared in body frame |
+| Measurement noise R | 0.05 everywhere | per sensor | per sensor |
+
+### Results
+
+| Method | ATE vs GPS (full run) | Heading RMSE | RPE @ 10 m |
+|---|---:|---:|---:|
+| Raw wheel odometry | 19.58 m | 36.1° | 0.60 m |
+| EKF-A | 19.57 m | 18.0° | 4.49 m |
+| EKF-B | 19.30 m | 3.5° | 10.19 m |
+| **EKF-C** | **1.72 m** | **1.2°** | **0.27 m** |
+
+Per-segment numbers (4 × 60 s windows) are in [eval/results/metrics.md](eval/results/metrics.md). EKF-C has the lowest ATE and RPE in every segment.
+
+![All variants, full run](eval/results/traj_full.png)
+
+The key fact about this dataset: **the wheel odometry heading drifts by ~130° over the run**. Its yaw rate reads ~20 % high and is biased. The IMU heading stays within ~2° of the reference. Each variant's result is determined by how it handles this conflict.
+
+### EKF-A: original model
+
+![EKF-A](eval/results/variant_A.png)
+
+**What's good about the model:** it is the simplest complete IMU + odometry EKF. Every sensor goes into one measurement vector, and the observation model is linear (H is a selection matrix), so it's easy to understand and debug. The constant-acceleration motion model captures smooth speed changes, which a constant-velocity model can't.
+
+**What the plots show:** EKF-A lies almost exactly on top of the wheel odometry (ATE 19.57 m against 19.58 m).
+- It trusts the odometry x, y as much as every other sensor (R = 0.05), so its position follows the drifting wheel path.
+- Its heading is a compromise between the wheel and IMU headings. It halves the wheel heading error (18° against 36°) but doesn't remove it.
+- The raw accelerometer, with gravity leaking in through tilt, is compared directly against world-frame accelerations. This adds jitter, which shows up as the higher RPE.
+- Its 3σ band is under 1 m while its real error is ~20 m, so the filter is over-confident.
+
+### EKF-B: fixed model, still fusing the odom pose
+
+![EKF-B](eval/results/variant_B.png)
+
+**What's good about the model:**
+- The world-frame constant-acceleration model keeps the sign of the velocity, so it can represent reversing, and its Jacobian is exact.
+- The Jacobian is evaluated at the previous estimate, as in the textbook EKF.
+- Gravity is removed from the IMU using its orientation, and accelerations and wheel velocities are compared in the body frame, where those sensors actually measure.
+- The odom pose is expressed relative to the starting pose, so it shares a reference with the IMU yaw. This replaces the hardcoded −90° rotation.
+
+**What the plots show:**
+- **Heading is fixed.** The heading error drops to 3.5° RMSE and no longer drifts (right panel).
+- **Position isn't.** It is still fused as an absolute measurement, but the odom x, y were integrated with the bad wheel heading, so they aren't independent information. They keep pulling the estimate back onto the wheel path (left and middle panels, ATE 19.30 m).
+- **The two disagree.** The correct heading and the wrong position fight each other, which produces jumps (RPE 10 m) and a 3σ band that's again far too small.
+
+### EKF-C: fixed model, wheel velocity + IMU only (recommended, launch default)
+
+![EKF-C](eval/results/variant_C.png)
+
+**What's good about the model:** it uses the same improved model as B but fuses only what each sensor measures well:
+- from the wheels: **speed** (v_fwd, plus v_lat ≈ 0 for a non-holonomic robot)
+- from the IMU: **heading, yaw rate and gravity-compensated acceleration**
+
+Position is never measured directly. It comes from the motion model integrating speed along the IMU-corrected heading. This is the standard way to fuse wheel odometry: as a velocity sensor, not a pose sensor.
+
+**What the plots show:**
+- **Position:** the trajectory stays on the GPS track for the whole drive (ATE 1.72 m against 19.58 m for wheel odometry). Most of the remaining error is in the first ~30 s, where the GPS itself is poorest (open circles).
+- **Heading:** the error is flat around 0° (1.2° RMSE).
+- **Consistency:** the 3σ band grows steadily because position is dead-reckoned, and it always contains the actual error, so the filter's covariance can be trusted.
+
+![Segments](eval/results/traj_segments.png)
+
 ---
 
 #Future Scope of the Project :
