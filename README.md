@@ -2,6 +2,16 @@
 
 An implementation of an **Extended Kalman Filter** for fusing odometry and imu readings when the system follows a **constant‐acceleration** motion model. This repository demonstrates how to design and implement the EKF step by step, from the state definition to the prediction and update equations. 
 
+## Demo: three EKF variants in RViz2
+
+![EKF variants in RViz2](eval/results/rviz/ekf_variants_rviz.gif)
+
+The Linkou bag replayed at 4× speed, with all three EKF variants running side by side and aligned to GPS (white dots).
+- **EKF-C** (yellow, wheel velocity + IMU) stays on the GPS track. Its 3σ covariance ellipses grow because position is dead-reckoned, and they always contain the GPS track.
+- **EKF-A** (orange) and **EKF-B** (green) drift away together with the raw wheel odometry (gray). Their 3σ ellipses stay under 1 m, too small to see here, even though they are ~20 m off.
+
+See [Evaluation](#evaluation-three-ekf-variants-on-a-real-drive) for the numbers, and `eval/rviz_variants.sh` to run it yourself.
+
 ---
 
 ## Table of Contents
