@@ -1,4 +1,4 @@
-"""Runs EKF variants A, B and C side by side and shows them in RViz2 against GPS.
+"""Runs EKF variants A, B, C and D side by side and shows them in RViz2 against GPS.
 
     ros2 launch kalman_filter_app ekf_variants_rviz.launch.py alignment_file:=<repo>/eval/results/alignment.json
     ros2 bag play <bag_dir> --topics /wheel_odom /imu/data_raw /fix
@@ -24,9 +24,10 @@ def generate_launch_description():
                 'variant': v,
                 'node_name': f'ekf_{v}',
                 'output_topic': f'/ekf_{v}/odom',
+                'nis_topic': f'/ekf_{v}/nis',
             }.items(),
         )])
-        for v in ('A', 'B', 'C')
+        for v in ('A', 'B', 'C', 'D')
     ]
 
     return LaunchDescription([

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shows EKF variants A/B/C live in RViz2 while the Linkou bag plays.
+# Shows EKF variants A/B/C/D live in RViz2 while the Linkou bag plays.
 #
 # Build the image once:
 #   docker build -t sensorfusion-rviz -f eval/docker/Dockerfile.rviz eval/docker
