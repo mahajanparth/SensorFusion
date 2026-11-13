@@ -4,7 +4,7 @@ A ROS2 / C++ Extended Kalman Filter that fuses wheel odometry and IMU data for a
 
 ![EKF variants in RViz2](eval/results/rviz/ekf_variants_rviz.gif)
 
-*RViz2 playback of the Linkou dataset at 4x speed. Filter variants A-C run in parallel and are aligned to GPS (white dots). EKF-C (yellow) follows the GPS track and its 3σ ellipses grow as position is dead-reckoned. EKF-A (orange) and EKF-B (green) drift together with the raw wheel odometry (gray) while reporting less than 1 m of uncertainty.*
+*RViz2 playback of the Linkou dataset at 4x speed. All four filter variants run in parallel and are aligned to GPS (white dots). EKF-C (yellow) follows the GPS track and its 3σ ellipses grow as position is dead-reckoned. EKF-D (pink), which propagates with the IMU and measures only odom velocity, stays close to the track; its ellipses stretch sideways as gyro-only heading uncertainty builds up. EKF-A (orange) and EKF-B (green) drift together with the raw wheel odometry (gray) while reporting less than 1 m of uncertainty.*
 
 ### Highlights
 
@@ -352,6 +352,19 @@ A filter is consistent when its covariance matches its actual error. Two standar
 - **NEES** (normalized estimation error squared) `eᵀ P⁻¹ e`, using ground truth. Position NEES (2 dof) uses GPS. The estimate is aligned with the same SE(2) fit as the ATE, its covariance is rotated with it, and the GPS variance is added to P because the ground truth is itself noisy. Heading NEES (1 dof) uses the `/odom` reference, which has no covariance of its own, so it is an upper bound.
 
 A mean above the 95% χ² bound means the filter is **overconfident** (its covariance is too small). A mean below it means it is **underconfident**.
+
+Thresholds (two-sided 95%, i.e. the 2.5% and 97.5% points of χ²):
+
+| dof | Used for | Per-sample region | Bound on the mean (N samples) |
+|---:|---|---:|---:|
+| 1 | heading NEES | 0.001 – 5.02 | 0.92 – 1.09 (N ≈ 1090) |
+| 2 | position NEES | 0.051 – 7.38 | 1.75 – 2.26 (N ≈ 240 GPS fixes) |
+| 2 | NIS, EKF-D | 0.051 – 7.38 | 1.88 – 2.12 (N = 1089) |
+| 6 | NIS, EKF-C | 1.24 – 14.45 | 5.80 – 6.21 (N = 1088) |
+| 7 | NIS, EKF-A | 1.69 – 16.01 | 6.78 – 7.22 (N = 1088) |
+| 9 | NIS, EKF-B | 2.70 – 19.02 | 8.75 – 9.25 (N = 1088) |
+
+The per-sample region should contain about 95% of the individual values. The bound on the mean is `χ²(N·dof)/N` at the same probabilities, and it decides "over" or "under" in the table below. It assumes independent samples. Consecutive NEES/NIS values are correlated, so the true band is wider, and values just outside it (such as D's heading NEES of 1.15) are borderline rather than clear failures.
 
 | Variant | NIS mean (expected) | Position NEES mean (expected 2) | Heading NEES mean (expected 1) |
 |---|---:|---:|---:|
