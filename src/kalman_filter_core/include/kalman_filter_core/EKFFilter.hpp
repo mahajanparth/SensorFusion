@@ -16,6 +16,8 @@ namespace kalman
         std::function<Eigen::MatrixXd(const Eigen::VectorXd &, const Eigen::VectorXd &, double)> process_jac;
         std::function<Eigen::VectorXd(const Eigen::VectorXd &, double)> observation_func;
         std::function<Eigen::MatrixXd(const Eigen::VectorXd &, double)> observation_jac;
+        // Optional state/input/dt dependent process noise; when unset the constant q_process_noise is used.
+        std::function<Eigen::MatrixXd(const Eigen::VectorXd &, const Eigen::VectorXd &, double)> process_noise_func;
 
         Eigen::MatrixXd q_process_noise;
         Eigen::MatrixXd r_sensor_noise;
@@ -36,6 +38,11 @@ namespace kalman
         std::vector<int> angle_indices_z;
         // Linearize the process model at the previous posterior (textbook EKF) instead of the predicted mean.
         bool linearize_at_previous_mean = true;
+
+        // Innovation, its covariance and the NIS of the most recent update (for consistency checks).
+        Eigen::VectorXd last_innovation;
+        Eigen::MatrixXd last_innovation_cov;
+        double last_nis = 0.0;
 
     public:
         EKF() = default;
@@ -62,6 +69,14 @@ namespace kalman
         // Getter and setter for the observation Jacobian.
         void setObservationJacobian(const std::function<Eigen::MatrixXd(const Eigen::VectorXd &, double)> &jac);
         const std::function<Eigen::MatrixXd(const Eigen::VectorXd &, double)> &getObservationJacobian() const;
+
+        // Process noise as a function of (state, input, dt); overrides the constant covariance when set.
+        void setProcessNoiseFunction(const std::function<Eigen::MatrixXd(const Eigen::VectorXd &, const Eigen::VectorXd &, double)> &func);
+
+        // Normalized innovation squared (nu^T S^-1 nu) of the last update, plus the innovation and S.
+        double getLastNIS() const;
+        const Eigen::VectorXd &getLastInnovation() const;
+        const Eigen::MatrixXd &getLastInnovationCovariance() const;
 
         // Getter and setter for process noise covariance.
         void setProcessNoiseCovariance(const Eigen::MatrixXd &Q);

@@ -28,6 +28,7 @@ kalman::EKF::EKF(const Eigen::VectorXd &initial_state, const Eigen::MatrixXd &in
 std::pair<Eigen::VectorXd, Eigen::MatrixXd> kalman::EKF::predict(const Eigen::VectorXd &u, double dt)
 {
     Eigen::MatrixXd G_jac;
+    Eigen::MatrixXd Q = process_noise_func ? process_noise_func(x_prior_mean, u, dt) : q_process_noise;
     if (linearize_at_previous_mean)
     {
         G_jac = process_jac(x_prior_mean, u, dt);
@@ -38,7 +39,7 @@ std::pair<Eigen::VectorXd, Eigen::MatrixXd> kalman::EKF::predict(const Eigen::Ve
         x_prior_mean = nonlinear_process_model(x_prior_mean, u, dt);
         G_jac = process_jac(x_prior_mean, u, dt);
     }
-    x_prior_cov = G_jac * x_prior_cov * G_jac.transpose() + q_process_noise;
+    x_prior_cov = G_jac * x_prior_cov * G_jac.transpose() + Q;
     return {x_prior_mean, x_prior_cov};
 }
 
@@ -55,6 +56,10 @@ std::pair<Eigen::VectorXd, Eigen::MatrixXd> kalman::EKF::update(const Eigen::Vec
         innovation(idx) = std::atan2(std::sin(innovation(idx)), std::cos(innovation(idx)));
 
     x_posterior_mean = x_prior_mean + K * innovation;
+
+    last_innovation = innovation;
+    last_innovation_cov = S;
+    last_nis = innovation.dot(S.ldlt().solve(innovation));
 
     Eigen::MatrixXd I = Eigen::MatrixXd::Identity(x_prior_cov.rows(), x_prior_cov.cols());
     x_posterior_cov = (I - K * H_jac) * x_prior_cov;
@@ -103,6 +108,24 @@ void kalman::EKF::setObservationJacobian(const std::function<Eigen::MatrixXd(con
 const std::function<Eigen::MatrixXd(const Eigen::VectorXd &, const double )> &kalman::EKF::getObservationJacobian() const
 {
     return observation_jac;
+}
+
+void kalman::EKF::setProcessNoiseFunction(const std::function<Eigen::MatrixXd(const Eigen::VectorXd &, const Eigen::VectorXd &, double)> &func)
+{
+    process_noise_func = func;
+}
+
+double kalman::EKF::getLastNIS() const
+{
+    return last_nis;
+}
+const Eigen::VectorXd &kalman::EKF::getLastInnovation() const
+{
+    return last_innovation;
+}
+const Eigen::MatrixXd &kalman::EKF::getLastInnovationCovariance() const
+{
+    return last_innovation_cov;
 }
 
 // Getter and setter for process noise covariance.
