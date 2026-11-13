@@ -28,6 +28,8 @@ namespace motionmodel{
         //TODO : Convert to a template instead
         std::function<Eigen::VectorXd(const Eigen::VectorXd&, const Eigen::VectorXd&, double)> process_model;
         std::function<Eigen::MatrixXd(const Eigen::VectorXd&, const Eigen::VectorXd&, double)> process_jac;
+        // Optional: process noise as a function of (state, input, dt). Empty means a constant Q is used.
+        std::function<Eigen::MatrixXd(const Eigen::VectorXd&, const Eigen::VectorXd&, double)> process_noise;
         
     };
 
