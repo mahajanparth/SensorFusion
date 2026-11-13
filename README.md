@@ -1,16 +1,17 @@
 # Sensor Fusion: EKF for Wheel Odometry and IMU
 
-A ROS2 / C++ Extended Kalman Filter that fuses wheel odometry and IMU data for a ground robot, using a constant-acceleration motion model. The project covers the filter design (state, prediction and update), three variants of the filter, and an evaluation on a real outdoor dataset with GPS as ground truth.
+A ROS2 / C++ Extended Kalman Filter that fuses wheel odometry and IMU data for a ground robot, using a constant-acceleration motion model. The project covers the filter design (state, prediction and update), four variants of the filter (one propagated by the IMU), an evaluation on a real outdoor dataset with GPS as ground truth, and a consistency check of each filter with NEES and NIS.
 
 ![EKF variants in RViz2](eval/results/rviz/ekf_variants_rviz.gif)
 
-*RViz2 playback of the Linkou dataset at 4x speed. The three filter variants run in parallel and are aligned to GPS (white dots). EKF-C (yellow) follows the GPS track and its 3σ ellipses grow as position is dead-reckoned. EKF-A (orange) and EKF-B (green) drift together with the raw wheel odometry (gray) while reporting less than 1 m of uncertainty.*
+*RViz2 playback of the Linkou dataset at 4x speed. Filter variants A-C run in parallel and are aligned to GPS (white dots). EKF-C (yellow) follows the GPS track and its 3σ ellipses grow as position is dead-reckoned. EKF-A (orange) and EKF-B (green) drift together with the raw wheel odometry (gray) while reporting less than 1 m of uncertainty.*
 
 ### Highlights
 
 - 8-state EKF (position, heading, velocity, yaw rate, acceleration) with pluggable motion and observation models
-- Three filter variants compared on a 240 s, 247 m outdoor drive
+- Four filter variants compared on a 240 s, 247 m outdoor drive, including an IMU-propagated filter (EKF-D)
 - Best variant cuts position error from 19.6 m (wheel odometry) to 1.7 m and heading error from 36° to 1.2°
+- Filter consistency checked with NEES (vs GPS) and NIS for every variant
 - RViz2 view with live paths and 3σ covariance ellipses, runnable through Docker (`eval/rviz_variants.sh`)
 
 ---
@@ -25,8 +26,9 @@ A ROS2 / C++ Extended Kalman Filter that fuses wheel odometry and IMU data for a
 6. [Update Step](#update-step)
 7. [Installation and Usage](#installation-and-usage)
 8. [Results on the Linkou Dataset](#results-on-the-linkou-dataset)
-9. [Future Scope](#future-scope)
-10. [License](#license)
+9. [Filter Consistency: NEES and NIS](#filter-consistency-nees-and-nis)
+10. [Future Scope](#future-scope)
+11. [License](#license)
 
 ---
 
@@ -230,13 +232,13 @@ source install/setup.bash
 ### **1. Launch the Full Sensor Fusion Pipeline**
 
 ```bash
-# variant:=A|B|C (default C), inputs default to /wheel_odom and /imu/data_raw
+# variant:=A|B|C|D (default C), inputs default to /wheel_odom and /imu/data_raw
 ros2 launch kalman_filter_app launch_ekf_node.py variant:=C
 
 ros2 bag play <bag_dir> --topics /wheel_odom /imu/data_raw
 ```
 
-The fused estimate is published on `/ekf/odom` (`nav_msgs/Odometry`). To reproduce the results below, see [eval/README.md](eval/README.md).
+The fused estimate is published on `/ekf/odom` (`nav_msgs/Odometry`) and the NIS of every update on `/ekf/nis` (`[stamp, NIS, dim_z]`). To reproduce the results below, see [eval/README.md](eval/README.md).
 
 ---
 
@@ -250,18 +252,20 @@ The filter was tested on the Linkou bag (download link below), a 240 s, 247 m ou
 
 ### Filter variants
 
-All three variants share the EKF core and the 8-state vector `[x, y, θ, vx, vy, ω, ax, ay]`. They differ in the motion model and in which measurements they fuse.
+All four variants share the EKF core and an 8-state vector. A, B and C use `[x, y, θ, vx, vy, ω, ax, ay]` and treat the IMU as a sensor. D uses `[x, y, θ, vx, vy, b_ω, b_af, b_al]` and treats the IMU as the control input that drives the prediction.
 
-| | EKF-A | EKF-B | EKF-C |
-|---|---|---|---|
-| Motion model | speed √(vx²+vy²) along θ | world-frame constant acceleration | world-frame constant acceleration |
-| Jacobian evaluated at | predicted mean | previous posterior | previous posterior |
-| Measurements | odom x, y, θ; IMU θ, ω, ax, ay | odom x, y, θ; IMU θ, ω; odom v_fwd, v_lat; IMU ax, ay | IMU θ, ω; odom v_fwd, v_lat; IMU ax, ay |
-| Fuses odom pose | yes | yes | no |
-| IMU acceleration | raw (gravity tilt included) | gravity removed, body frame | gravity removed, body frame |
-| Measurement noise R | 0.05 for all | tuned per sensor | tuned per sensor |
+| | EKF-A | EKF-B | EKF-C | EKF-D |
+|---|---|---|---|---|
+| Motion model | speed √(vx²+vy²) along θ | world-frame constant acceleration | world-frame constant acceleration | IMU-driven: integrates gyro and accelerometer |
+| Prediction rate | odom | odom | odom | IMU |
+| Jacobian evaluated at | predicted mean | previous posterior | previous posterior | previous posterior |
+| Measurements | odom x, y, θ; IMU θ, ω, ax, ay | odom x, y, θ; IMU θ, ω; odom v_fwd, v_lat; IMU ax, ay | IMU θ, ω; odom v_fwd, v_lat; IMU ax, ay | odom v_fwd, v_lat only |
+| Fuses odom pose | yes | yes | no | no |
+| Uses IMU orientation (yaw) | yes | yes | yes | no (only roll/pitch, to remove gravity) |
+| IMU acceleration | raw (gravity tilt included) | gravity removed, body frame | gravity removed, body frame | gravity removed, control input |
+| Process noise Q | constant per step | constant per step | constant per step | from IMU noise densities, scales with dt |
 
-Select a variant with `variant:=A`, `B` or `C` at launch. C is the default.
+Select a variant with `variant:=A`, `B`, `C` or `D` at launch. C is the default.
 
 ### Summary
 
@@ -270,9 +274,10 @@ Select a variant with `variant:=A`, `B` or `C` at launch. C is the default.
 | Raw wheel odometry | 19.58 m | 36.1° | 0.60 m |
 | EKF-A | 19.57 m | 18.0° | 4.49 m |
 | EKF-B | 19.30 m | 3.5° | 10.19 m |
-| **EKF-C** | **1.72 m** | **1.2°** | **0.27 m** |
+| **EKF-C** | **1.71 m** | **1.2°** | **0.27 m** |
+| EKF-D | 4.14 m | 7.2° | 0.48 m |
 
-Results for four 60 s segments are in [eval/results/metrics.md](eval/results/metrics.md). EKF-C has the lowest position error and drift in every segment.
+Results for four 60 s segments are in [eval/results/metrics.md](eval/results/metrics.md). EKF-C has the lowest drift in every segment and the lowest or tied-lowest position error in all but one (in segment 2, D is at 0.38 m vs 0.46 m).
 
 ![All variants, full run](eval/results/traj_full.png)
 
@@ -316,11 +321,53 @@ On this dataset the wheel odometry heading drifts by about 130° over the run (i
 Position is never measured directly. It comes from integrating the wheel speed along the IMU-corrected heading, which treats wheel odometry as a velocity sensor rather than a pose sensor.
 
 **Result.**
-- The trajectory stays on the GPS track for the whole drive (1.72 m vs 19.58 m for wheel odometry). Most of the remaining error is in the first 30 s, where the GPS fix is weakest (open circles).
+- The trajectory stays on the GPS track for the whole drive (1.71 m vs 19.58 m for wheel odometry). Most of the remaining error is in the first 30 s, where the GPS fix is weakest (open circles).
 - Heading error stays flat around 0° (1.2° RMSE).
 - The 3σ band grows steadily as position is dead-reckoned and always contains the actual error, so the reported covariance is reliable.
 
+### EKF-D: IMU-propagated, odom velocity as the only measurement
+
+![EKF-D](eval/results/variant_D.png)
+
+**Model.** The IMU is no longer a measurement. On every IMU message the filter integrates the bias-corrected gyro rate and gravity-compensated acceleration (rotated into the world frame by θ) to predict position, heading and velocity. On every wheel-odom message it corrects with the body-frame velocity `[v_fwd, v_lat]` and nothing else: no odom pose, no odom yaw rate, no IMU yaw.
+- The state carries a gyro bias and two accelerometer biases instead of ω, ax and ay.
+- Process noise comes from the IMU noise densities mapped through the input Jacobian, plus a small random walk, so Q scales with dt rather than with the number of messages.
+- Between two IMU samples the input is their mean (trapezoidal rule).
+
+**Result.**
+- 4.14 m position error and 7.2° heading RMSE, against 19.6 m and 36° for wheel odometry. On its own the odom velocity becomes a useful measurement once the heading comes from the gyro.
+- It does not reach C. With only velocity measured, heading and position are unobservable, so D's heading is pure gyro dead-reckoning. The IMU in this bag arrives at about 4.7 Hz in bursts, with gaps of up to 0.8 s, and integrating it alone already gives up to 12° of heading error. C instead corrects heading every step with the IMU's own orientation estimate, which stays within 2° of the reference.
+- Estimating the gyro bias from velocity residuals made heading worse (13° RMSE). At this IMU rate the residuals mostly come from accelerometer error, so the bias prior is kept tight (σ ≈ 0.002 rad/s, from the standstill samples).
+- D is the only variant whose position covariance matches its error (NEES inside the χ² bound, below). The 3σ band grows with distance and contains the error for the whole run.
+
 ![Segments](eval/results/traj_segments.png)
+
+---
+
+## Filter Consistency: NEES and NIS
+
+A filter is consistent when its covariance matches its actual error. Two standard checks, computed by [eval/evaluate.py](eval/evaluate.py) for every variant:
+
+- **NIS** (normalized innovation squared) `νᵀ S⁻¹ ν`, from the filter's own innovation ν and innovation covariance S at each update. It needs no ground truth. For a consistent filter it follows χ² with `dim_z` degrees of freedom.
+- **NEES** (normalized estimation error squared) `eᵀ P⁻¹ e`, using ground truth. Position NEES (2 dof) uses GPS. The estimate is aligned with the same SE(2) fit as the ATE, its covariance is rotated with it, and the GPS variance is added to P because the ground truth is itself noisy. Heading NEES (1 dof) uses the `/odom` reference, which has no covariance of its own, so it is an upper bound.
+
+A mean above the 95% χ² bound means the filter is **overconfident** (its covariance is too small). A mean below it means it is **underconfident**.
+
+| Variant | NIS mean (expected) | Position NEES mean (expected 2) | Heading NEES mean (expected 1) |
+|---|---:|---:|---:|
+| EKF-A | 34.4 (7), over | 407, over | 4.8, over |
+| EKF-B | 173 (9), over | 361, over | 12.3, over |
+| EKF-C | 0.92 (6), under | 0.30, under | 1.4, over |
+| EKF-D | 0.23 (2), under | **2.2, consistent** | 1.15, slightly over |
+
+![NEES and NIS](eval/results/consistency_nees_nis.png)
+
+- **A and B are badly overconfident.** Their NIS rises during the run because the odom pose and the IMU heading disagree more and more, and the filter has no way to explain that. Position NEES in the hundreds matches the 20 m error against less than 1 m of reported σ.
+- **C is underconfident in position** (NEES 0.3, so the typical error is about 0.4σ). Its process noise on position could be smaller. Its heading is slightly overconfident (1.4).
+- **D is consistent in position and close to consistent in heading.** Its NIS is low because the noise that protects the heading (accelerometer and velocity random walk) also inflates S. Per-update innovations are small, while the error that matters builds up slowly over many IMU gaps. White-noise Q cannot represent that.
+- D's noise values were chosen with these checks (see `launch_ekf_node.py`). Because NEES uses ground truth, D's position consistency is partly the result of that tuning.
+
+Full tables, including the share of samples inside the per-sample χ² region, are in [eval/results/consistency.md](eval/results/consistency.md).
 
 ---
 
