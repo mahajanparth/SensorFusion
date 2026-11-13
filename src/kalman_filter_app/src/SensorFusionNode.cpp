@@ -156,10 +156,16 @@ void SensorFusionNode::imu_callback(const std::shared_ptr<sensor_msgs::msg::Imu>
 
     if (imu_propagation)
     {
-        // Integrate up to this sample with the previous one, then hold this one until the next message.
+        // Integrate up to this sample with the mean of the previous and the new sample (trapezoidal rule),
+        // then hold the new one until the next message. The IMU arrives in bursts with gaps up to 0.8 s,
+        // and holding only the old sample over those gaps roughly doubles the heading error.
+        Eigen::Vector3d sample(imu_w, ax, ay);
         if (initial_pose_flag)
+        {
+            imu_input = 0.5 * (imu_input + sample);
             propagate_imu_to(rclcpp::Time(imu_msg->header.stamp).seconds());
-        imu_input = Eigen::Vector3d(imu_w, ax, ay);
+        }
+        imu_input = sample;
         imu_input_valid = true;
         return;
     }
