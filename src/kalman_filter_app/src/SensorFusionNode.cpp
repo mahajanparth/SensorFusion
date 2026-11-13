@@ -31,6 +31,9 @@ SensorFusionNode::SensorFusionNode(const std::string &name) : rclcpp::Node(name)
 
     this->declare_parameter<bool>("model_fixes", false);
     this->declare_parameter<bool>("use_odom_pose", true);
+    this->declare_parameter<bool>("imu_propagation", false);
+    // Variant D: IMU white-noise densities [gyro rad/s/sqrt(Hz), accel m/s^2/sqrt(Hz)].
+    this->declare_parameter<std::vector<double>>("imu_noise_density", std::vector<double>({0.01, 0.1}));
 
     // Load parameters from ROS2
     std::vector<double> Q_data = this->get_parameter("Q_process_noise").as_double_array();
@@ -50,6 +53,8 @@ SensorFusionNode::SensorFusionNode(const std::string &name) : rclcpp::Node(name)
 
     model_fixes = this->get_parameter("model_fixes").as_bool();
     use_odom_pose = this->get_parameter("use_odom_pose").as_bool();
+    imu_propagation = this->get_parameter("imu_propagation").as_bool();
+    std::vector<double> imu_noise = this->get_parameter("imu_noise_density").as_double_array();
 
     // Debug print statements
     std::cout << "Q_process_noise (size: " << Q_data.size() << "): ";
@@ -82,7 +87,17 @@ SensorFusionNode::SensorFusionNode(const std::string &name) : rclcpp::Node(name)
     
     std::vector<int> angle_indices;
     int expected_dim_z;
-    if (model_fixes)
+    if (imu_propagation)
+    {
+        // Q_process_noise is a continuous-time density here; the motion model scales it by dt.
+        if (imu_noise.size() != 2)
+            throw std::runtime_error("imu_noise_density must be [gyro, accel]");
+        motion_model_ = std::make_shared<motionmodel::ImuDrivenMotionModel>(imu_noise[0], imu_noise[1], Q_process_noise);
+        observation_model_ = std::make_shared<observationmodel::OdomVelocityObservationModel>();
+        angle_indices = {};
+        expected_dim_z = observationmodel::OdomVelocityObservationModel::dim_z;
+    }
+    else if (model_fixes)
     {
         motion_model_ = std::make_shared<motionmodel::ConstantAccWorldMotionModel>();
         auto body_frame_model = std::make_shared<observationmodel::ImuOdomBodyFrameObservationModel>(use_odom_pose);
@@ -109,11 +124,13 @@ SensorFusionNode::SensorFusionNode(const std::string &name) : rclcpp::Node(name)
         Mu, Cov, Q_process_noise, R_observation_state, motion_model_, observation_model_);
     filter->ekf_filter_->setAngleIndices(angle_indices);
     // The original implementation linearized at the predicted mean; keep that behaviour for version A.
-    filter->ekf_filter_->setLinearizeAtPreviousMean(model_fixes);
+    filter->ekf_filter_->setLinearizeAtPreviousMean(model_fixes || imu_propagation);
 
-    RCLCPP_INFO(this->get_logger(), "model_fixes=%d use_odom_pose=%d dim_z=%d", model_fixes, use_odom_pose, expected_dim_z);
+    RCLCPP_INFO(this->get_logger(), "model_fixes=%d use_odom_pose=%d imu_propagation=%d dim_z=%d",
+                model_fixes, use_odom_pose, imu_propagation, expected_dim_z);
 
     fused_odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("/ekf/odom", 50);
+    nis_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>("/ekf/nis", 50);
 
     odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
         "/odom", 50, std::bind(&SensorFusionNode::odom_callback, this, std::placeholders::_1));
@@ -128,13 +145,23 @@ void SensorFusionNode::imu_callback(const std::shared_ptr<sensor_msgs::msg::Imu>
     ay = imu_msg->linear_acceleration.y;
     imu_w = imu_msg->angular_velocity.z;
 
-    if (model_fixes)
+    if (model_fixes || imu_propagation)
     {
         // Remove gravity: rotate the world gravity vector into the IMU frame using roll/pitch/yaw from the IMU.
         tf2::Quaternion q(imu_msg->orientation.x, imu_msg->orientation.y, imu_msg->orientation.z, imu_msg->orientation.w);
         tf2::Vector3 g_body = tf2::Matrix3x3(q).transpose() * tf2::Vector3(0.0, 0.0, 9.80665);
         ax -= g_body.x();
         ay -= g_body.y();
+    }
+
+    if (imu_propagation)
+    {
+        // Integrate up to this sample with the previous one, then hold this one until the next message.
+        if (initial_pose_flag)
+            propagate_imu_to(rclcpp::Time(imu_msg->header.stamp).seconds());
+        imu_input = Eigen::Vector3d(imu_w, ax, ay);
+        imu_input_valid = true;
+        return;
     }
 
     double imu_thetha = quat_to_yaw(imu_msg->orientation);
@@ -154,6 +181,25 @@ void SensorFusionNode::imu_callback(const std::shared_ptr<sensor_msgs::msg::Imu>
 void SensorFusionNode::odom_callback(const std::shared_ptr<nav_msgs::msg::Odometry> odom_msg)
 {
     double t = rclcpp::Time(odom_msg->header.stamp).seconds();
+
+    if (imu_propagation)
+    {
+        // The filter frame is the robot's starting pose, so the first odom message only starts the clock.
+        if (!imu_input_valid)
+            return;
+        if (!initial_pose_flag)
+        {
+            initial_pose_flag = true;
+            last_prop_time = t;
+            return;
+        }
+        propagate_imu_to(t);
+        Eigen::Vector2d z(odom_msg->twist.twist.linear.x, odom_msg->twist.twist.linear.y);
+        std::tie(Mu, Cov) = filter->ekf_filter_->update(z, 0.0);
+        publish_nis(t);
+        publish_estimate(odom_msg->header.stamp);
+        return;
+    }
 
     if (!initial_pose_flag)
     {
@@ -208,7 +254,26 @@ void SensorFusionNode::odom_callback(const std::shared_ptr<nav_msgs::msg::Odomet
     z_observation = Eigen::Map<Eigen::VectorXd>(z_vec.data(), z_vec.size());
     std::tie(Mu, Cov) = filter->ekf_filter_->update(z_observation, dt);
 
+    publish_nis(t);
     publish_estimate(odom_msg->header.stamp);
+}
+
+void SensorFusionNode::propagate_imu_to(double t)
+{
+    double dt = t - last_prop_time;
+    // Messages from the two sensors can arrive slightly out of order; never integrate backwards.
+    if (dt <= 0.0)
+        return;
+    last_prop_time = t;
+    std::tie(Mu, Cov) = filter->ekf_filter_->predict(imu_input, dt);
+}
+
+void SensorFusionNode::publish_nis(double t)
+{
+    std_msgs::msg::Float64MultiArray msg;
+    msg.data = {t, filter->ekf_filter_->getLastNIS(),
+                static_cast<double>(filter->ekf_filter_->getLastInnovation().size())};
+    nis_pub_->publish(msg);
 }
 
 void SensorFusionNode::publish_estimate(const builtin_interfaces::msg::Time &stamp)
@@ -237,7 +302,8 @@ void SensorFusionNode::publish_estimate(const builtin_interfaces::msg::Time &sta
     // Twist is reported in the world (ekf_odom) frame, as estimated.
     out.twist.twist.linear.x = Mu(3);
     out.twist.twist.linear.y = Mu(4);
-    out.twist.twist.angular.z = Mu(5);
+    // Variant D keeps the gyro bias in Mu(5); its yaw rate is the bias-corrected gyro reading.
+    out.twist.twist.angular.z = imu_propagation ? imu_input(0) - Mu(5) : Mu(5);
 
     fused_odom_pub_->publish(out);
 }

@@ -17,15 +17,18 @@
 #include <motion_model/baseMotionModel.hpp>
 #include <motion_model/constantAccelrationModel.hpp>
 #include <motion_model/constantAccelerationWorldModel.hpp>
+#include <motion_model/imuDrivenMotionModel.hpp>
 
 #include <observation_model/baseObservationModel.hpp>
 #include <observation_model/ImuOdomObservationModel.hpp>
 #include <observation_model/ImuOdomBodyFrameObservationModel.hpp>
+#include <observation_model/OdomVelocityObservationModel.hpp>
 #include <kalman_filter_app/BaseSensorFusion.hpp>
 #include <kalman_filter_app/SensorFusionImuOdom.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/imu.hpp>
 #include <nav_msgs/msg/odometry.hpp>
+#include <std_msgs/msg/float64_multi_array.hpp>
 
 class SensorFusionNode : public rclcpp::Node
 {
@@ -39,12 +42,17 @@ public:
 
 private:
     void publish_estimate(const builtin_interfaces::msg::Time &stamp);
+    void publish_nis(double t);
+    // Variant D: integrate the latest IMU sample (zero-order hold) from the last propagation time to t.
+    void propagate_imu_to(double t);
 
     rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
     rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
     std::shared_ptr<sensor_fusion::SensorFusionImuOdom> filter;
 
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr fused_odom_pub_;
+    // [stamp, NIS, dim_z] after every update.
+    rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr nis_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
     std::tuple<double, double, double> current_pose2d;
     std::tuple<double, double, double> initial_pose2d;
@@ -57,6 +65,11 @@ private:
     bool model_fixes = false;
     // Only used with model_fixes: feed the odom pose (x, y, theta) as a measurement, or only its twist.
     bool use_odom_pose = true;
+    // Variant D: the IMU drives the prediction (control input) and only the odom twist is a measurement.
+    bool imu_propagation = false;
+    Eigen::VectorXd imu_input;   // [w, a_fwd, a_lat], gravity removed
+    bool imu_input_valid = false;
+    double last_prop_time = 0.0;
 
     double initial_imu_thetha = 0.0, normalize_imu_delta_angle = 0.0;
     double normalize_imu_angle = 0.0;

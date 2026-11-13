@@ -33,4 +33,7 @@ sensor_fusion::SensorFusionImuOdom::SensorFusionImuOdom(const Eigen::VectorXd &i
 
     // Direct assignment for Observation Jacobian
     ekf_filter_->setObservationJacobian(obs_mdl->observation_jac);
+
+    if (mtn_mdl->process_noise)
+        ekf_filter_->setProcessNoiseFunction(mtn_mdl->process_noise);
 }
