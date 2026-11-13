@@ -25,6 +25,7 @@ find_package(Eigen3 REQUIRED)
 
 add_library(${PROJECT_NAME} SHARED
   src/baseObservationModel.cpp src/ImuOdomObservationModel.cpp src/ImuOdomBodyFrameObservationModel.cpp
+  src/OdomVelocityObservationModel.cpp
 )
 ament_target_dependencies(${PROJECT_NAME} Eigen3 )
 
