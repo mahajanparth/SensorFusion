@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Builds the workspace inside the ros:humble container and runs each EKF variant over the Linkou bag,
-# recording /ekf/odom to eval/results/run_<variant>.
+# recording /ekf/odom and /ekf/nis to eval/results/run_<variant>.
 #
 # Usage (from the repo root):
 #   docker run --rm -v "$PWD":/ws -v ~/Downloads/linkou:/data:ro ros:humble-ros-base-jammy \
-#       bash /ws/eval/run_variants.sh A B C
+#       bash /ws/eval/run_variants.sh A B C D
 set -e
 source /opt/ros/humble/setup.bash
 cd /ws
@@ -23,7 +23,7 @@ for V in "$@"; do
     rm -rf "$OUT"
     ros2 launch kalman_filter_app launch_ekf_node.py variant:=$V > /ws/eval/results/node_$V.log 2>&1 &
     NODE=$!
-    ros2 bag record -o "$OUT" /ekf/odom > /dev/null 2>&1 &
+    ros2 bag record -o "$OUT" /ekf/odom /ekf/nis > /dev/null 2>&1 &
     REC=$!
     sleep 3
     ros2 bag play "$BAG" --rate $RATE --topics /wheel_odom /imu/data_raw > /ws/eval/results/play_$V.log 2>&1

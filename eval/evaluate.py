@@ -4,8 +4,8 @@ Run with the anaconda python (needs rosbags, numpy, matplotlib):
     python eval/evaluate.py
 
 Inputs:  the Linkou bag (ground truth + baselines, cached to results/inputs.npz)
-         results/run_<A|B|C>/  (recorded /ekf/odom from run_variants.sh)
-Outputs: results/metrics.csv, results/metrics.md, results/*.png
+         results/run_<A|B|C|D>/  (recorded /ekf/odom and /ekf/nis from run_variants.sh)
+Outputs: results/metrics.csv, results/metrics.md, results/consistency.md, results/*.png
 """
 import csv
 import json
@@ -15,6 +15,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
+from scipy.stats import chi2  # noqa: E402
 
 from _bagio import BAG, Reader, typestore  # noqa: E402
 
@@ -30,7 +31,10 @@ STYLE = {
     'A': dict(color='#eb6834', label='EKF-A original model (overlaps wheel odom)'),
     'B': dict(color='#1baf7a', label='EKF-B fixed model + odom pose'),
     'C': dict(color='#eda100', label='EKF-C fixed model, odom velocity only'),
+    'D': dict(color='#e87ba4', label='EKF-D IMU-propagated, odom velocity only'),
 }
+EKFS = ('A', 'B', 'C', 'D')
+CHI2_P = 0.95  # two-sided acceptance region used for NEES / NIS
 INK, MUTED, GRID = '#0b0b0b', '#8a8984', '#e6e5e0'
 
 
@@ -51,11 +55,13 @@ def read_odom_bag(path, topics):
             m = ts.deserialize_cdr(raw, c.msgtype)
             if c.topic == '/fix':
                 out[c.topic].append((stamp(m), m.latitude, m.longitude, m.position_covariance[0]))
+            elif c.topic == '/ekf/nis':
+                out[c.topic].append(tuple(m.data))  # [stamp, NIS, dim_z]
             else:
                 p = m.pose.pose
                 cov = np.asarray(m.pose.covariance).reshape(6, 6)
                 out[c.topic].append((stamp(m), p.position.x, p.position.y, yaw_of(p.orientation),
-                                     cov[0, 0], cov[1, 1], cov[5, 5]))
+                                     cov[0, 0], cov[1, 1], cov[5, 5], cov[0, 1]))
     return {k: np.array(v) for k, v in out.items()}
 
 
@@ -137,6 +143,41 @@ def evaluate_window(est, gps, ref, t0, t1):
     )
 
 
+def chi2_bounds(dof, n=1):
+    """Two-sided CHI2_P region for the mean of n independent chi2(dof) samples."""
+    a = (1 - CHI2_P) / 2
+    return chi2.ppf(a, n * dof) / n, chi2.ppf(1 - a, n * dof) / n
+
+
+def consistency(est, m, gps):
+    """Position NEES vs GPS (2 dof) and heading NEES vs the /odom reference (1 dof).
+
+    Position: the estimate is mapped into the GPS frame with the same SE(2) alignment as the ATE,
+    its x/y covariance is rotated with it and the GPS variance is added, because the ground truth
+    itself is noisy:  NEES = e^T (R P R^T + sigma_gps^2 I)^-1 e.
+    Heading: the error after removing the constant frame offset, over the filter's yaw variance.
+    The reference heading has no covariance of its own, so this one is an upper bound.
+    """
+    tg = m['_tg']
+    g = gps[np.searchsorted(gps[:, 0], tg)]
+    pxx, pyy, pxy = (np.interp(tg, est[:, 0], est[:, i]) for i in (4, 5, 7))
+    P = np.stack([np.stack([pxx, pxy], -1), np.stack([pxy, pyy], -1)], -2)
+    R = m['_R']
+    S = R @ P @ R.T + g[:, 3, None, None] * np.eye(2)
+    e = interp_traj(est, tg)[:, :2] @ R.T + m['_t'] - g[:, 1:3]
+    nees_pos = np.einsum('ni,ni->n', e, np.linalg.solve(S, e[..., None])[..., 0])
+    var_yaw = np.interp(m['_tr_t'], est[:, 0], est[:, 6])
+    nees_yaw = m['_dyaw'] ** 2 / var_yaw
+    return nees_pos, nees_yaw
+
+
+def summarize(x, dof):
+    lo, hi = chi2_bounds(dof)
+    mlo, mhi = chi2_bounds(dof, len(x))
+    return dict(dof=dof, n=len(x), mean=float(np.mean(x)), mean_lo=mlo, mean_hi=mhi,
+                inside=float(np.mean((x >= lo) & (x <= hi)) * 100))
+
+
 def setup_ax(ax, title):
     ax.set_title(title, loc='left', fontsize=11, color=INK)
     ax.grid(True, color=GRID, linewidth=0.8)
@@ -175,10 +216,14 @@ def main():
     inp = load_inputs()
     gps, ref = inp['gps'], inp['ref']
     trajs = {'wheel_odom': inp['wheel_odom']}
-    for v in ('A', 'B', 'C'):
+    nis = {}
+    for v in EKFS:
         p = os.path.join(RES, f'run_{v}')
         if os.path.isdir(p):
-            trajs[v] = read_odom_bag(p, ['/ekf/odom'])['/ekf/odom']
+            d = read_odom_bag(p, ['/ekf/odom', '/ekf/nis'])
+            trajs[v] = d['/ekf/odom']
+            if len(d['/ekf/nis']):
+                nis[v] = d['/ekf/nis']
     tstart = gps[0, 0]
 
     windows = [('full', 0, 240)] + [(f'seg{i + 1} ({a}-{b}s)', a, b) for i, (a, b) in enumerate(SEGMENTS)]
@@ -247,7 +292,7 @@ def main():
     plt.close(fig)
 
     # Consistency: position error vs the filter's own 3-sigma bound (EKF variants only).
-    ekfs = [k for k in ('A', 'B', 'C') if k in trajs]
+    ekfs = [k for k in EKFS if k in trajs]
     fig, axs = plt.subplots(len(ekfs), 1, figsize=(10, 2.6 * len(ekfs)), sharex=True, squeeze=False)
     for ax, k in zip(axs[:, 0], ekfs):
         m = results['full'][k]
@@ -326,6 +371,61 @@ def main():
     ax.legend(fontsize=8, frameon=False)
     fig.tight_layout()
     fig.savefig(os.path.join(RES, 'ate_bars.png'), dpi=150)
+    plt.close(fig)
+
+    write_consistency(trajs, nis, full, gps, ekfs, tstart)
+
+
+def write_consistency(trajs, nis, full, gps, ekfs, tstart):
+    """NEES / NIS table and plot for every EKF variant (full run)."""
+    stats, series = {}, {}
+    for k in ekfs:
+        nees_pos, nees_yaw = consistency(trajs[k], full[k], gps)
+        series[k] = dict(nees_pos=(full[k]['_tg'], nees_pos))
+        stats[k] = dict(nees_pos=summarize(nees_pos, 2), nees_yaw=summarize(nees_yaw, 1))
+        if k in nis:
+            n = nis[k]
+            series[k]['nis'] = (n[:, 0], n[:, 1], int(n[0, 2]))
+            stats[k]['nis'] = summarize(n[:, 1], int(n[0, 2]))
+
+    def cell(st):
+        flag = '' if st['mean_lo'] <= st['mean'] <= st['mean_hi'] else (' (over)' if st['mean'] > st['mean_hi'] else ' (under)')
+        return (f"{st['mean']:.3g}{flag} | {st['dof']} | {st['mean_lo']:.2f}-{st['mean_hi']:.2f} | {st['inside']:.0f} %")
+
+    with open(os.path.join(RES, 'consistency.md'), 'w') as f:
+        f.write(f'Full run. "in band" is the share of samples inside the per-sample {CHI2_P:.0%} chi-square region '
+                f'(ideal {CHI2_P:.0%}). "(over)" means the mean is above the {CHI2_P:.0%} bound for the mean, '
+                'i.e. the filter is overconfident; "(under)" means underconfident.\n\n')
+        for title, key in (('NIS (innovation vs S)', 'nis'), ('Position NEES vs GPS', 'nees_pos'),
+                           ('Heading NEES vs /odom reference', 'nees_yaw')):
+            f.write(f'### {title}\n\n| variant | mean | dof | {CHI2_P:.0%} bound on mean | in band |\n'
+                    '|---|---:|---:|---:|---:|\n')
+            for k in ekfs:
+                if key in stats[k]:
+                    f.write(f'| {k} | {cell(stats[k][key])} |\n')
+            f.write('\n')
+    print(open(os.path.join(RES, 'consistency.md')).read())
+
+    fig, axs = plt.subplots(len(ekfs), 2, figsize=(13, 2.6 * len(ekfs)), sharex=True, squeeze=False)
+    for row, k in zip(axs, ekfs):
+        for ax, key, title in ((row[0], 'nis', 'NIS'), (row[1], 'nees_pos', 'position NEES vs GPS')):
+            setup_ax(ax, f'EKF-{k}: {title}')
+            if key not in series[k]:
+                continue
+            t, x = series[k][key][:2]
+            dof = series[k][key][2] if key == 'nis' else 2
+            lo, hi = chi2_bounds(dof)
+            ax.axhspan(lo, hi, color=MUTED, alpha=0.15, linewidth=0, label=f'{CHI2_P:.0%} χ² region ({dof} dof)')
+            ax.axhline(dof, color=MUTED, linestyle='--', linewidth=1, label=f'expected = {dof}')
+            ax.plot(t - tstart, x, color=STYLE[k]['color'], linewidth=1.2 if key == 'nis' else 2, label=title)
+            ax.set_yscale('log')
+            ax.legend(fontsize=7, loc='upper left', framealpha=0.85, edgecolor='none')
+    for ax in axs[-1]:
+        ax.set_xlabel('time since start [s]')
+    fig.suptitle('Filter consistency: values above the band mean the filter is overconfident, below it underconfident',
+                 x=0.01, ha='left', fontsize=11)
+    fig.tight_layout()
+    fig.savefig(os.path.join(RES, 'consistency_nees_nis.png'), dpi=140)
     plt.close(fig)
 
 
